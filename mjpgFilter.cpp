@@ -229,7 +229,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 2.294607 + 191.472 * pow(2.7182818284590452353602874713527, -0.04040384 * distance);
+    skew = 2.294607 + 36996 * pow(distance, -1.980852);
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
