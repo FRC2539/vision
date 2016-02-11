@@ -38,6 +38,7 @@ std::vector<cv::Rect> targets;
 cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
+cv::Point ropeLine1(10, 50), ropeLine2(10, 200);
 double area, solidity, ratio;
 
 namespace color {
@@ -115,6 +116,11 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 #endif
 #if DIRECTION_BOTH || DIRECTION_BACK
     findBoiler(corrected, contours);
+
+    if (targetInfo->getBool("climbing", true))
+    {
+        cv::line(corrected, ropeLine1, ropeLine2, color::orange, 2);
+    }
 #endif
 
     cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
