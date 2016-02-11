@@ -38,7 +38,7 @@ std::vector<cv::Rect> targets;
 cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
-cv::Point ropeLine1(80, 20), ropeLine2(20, 440);
+cv::Point ropeLine1(170, 20), ropeLine2(30, 440);
 double area, solidity, ratio, distance, skew;
 
 namespace color {
@@ -229,7 +229,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 2.294607 + 36996 * pow(distance, -1.980852);
+    skew = 0;            //2.294607 + 36996 * pow(distance, -1.980852);
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
