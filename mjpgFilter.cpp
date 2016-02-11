@@ -29,7 +29,7 @@ std::shared_ptr<NetworkTable> targetInfo;
 
 // For alleged performance reasons
 std::vector<int> lowerHSVthreshold = {0, 0, 235};
-std::vector<int> upperHSVthreshold = {255, 20, 255};
+std::vector<int> upperHSVthreshold = {255, 5, 255 };
 std::vector<std::vector<cv::Point>> contours;
 std::vector<cv::Vec4i> hierarchy;
 std::vector<cv::Point> hull, combined;
@@ -39,7 +39,7 @@ cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
 cv::Point ropeLine1(170, 20), ropeLine2(30, 440);
-cv::Rect reticle(cv::Point(250, 10), cv::Point(450, 160));
+cv::Rect reticle(cv::Point(220, 10), cv::Point(420, 160));
 double area, solidity, ratio, distance, skew;
 
 namespace color {
@@ -70,8 +70,8 @@ bool filter_init(const char * args, void** filter_ctx) {
 
     // Read camera settings
 #if DIRECTION_BOTH || DIRECTION_FRONT
-    //char configFile[] = "front_camera_data.xml";
-    char configFile[] = "back_camera_data.xml";
+    char configFile[] = "front_camera_data.xml";
+    //char configFile[] = "back_camera_data.xml";
 #elif DIRECTION_BACK
     char configFile[] = "back_camera_data.xml";
 #else
@@ -130,7 +130,7 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
         cv::rectangle(corrected, reticle, color::yellow, 2);
         cv::drawMarker(
             corrected,
-            cv::Point(350, 85),
+            cv::Point(320, 85),
             color::yellow,
             cv::MARKER_CROSS,
             20,
@@ -159,25 +159,29 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     {
         box = cv::minAreaRect(contour);
 
-        // Ignore if too skinny
-        if (box.size.width < 5.0 || box.size.height < 8.0) continue;
-
         // Ignore if too small
         area = cv::contourArea(contour);
         if (area < 30.0) continue;
 
-        // Ignore if too rotated
         // RotatedRects only have angles in the range [-90, 0)
         // Use the width and height to figure out if the long side is vertical
         if (box.size.width < box.size.height)
         {
+            // Ignore if too rotated
             if (box.angle < -10) continue;
+
+            // Ignore if too skinny
+            if (box.size.width < 5.0) continue;
 
             ratio = box.size.width / box.size.height;
         }
         else
         {
-            if (box.angle > -80) continue;
+            // Ignore if too rotated
+            //if (box.angle > -80) continue;
+
+            // Ignore if too skinny
+            if (box.size.height < 5.0) continue;
 
             ratio = box.size.height / box.size.width;
         }
@@ -188,7 +192,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 90.0) continue;
+        if (solidity < 80.0) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -257,7 +261,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 62.38539 + 2.99158569 * (1 - pow(2.718281828459, 0.03162349 * distance));
+    skew = 0;
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
