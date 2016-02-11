@@ -6,7 +6,6 @@
 #include <deque>
 #include <opencv2/opencv.hpp>
 #include <cmath>
-#include <unistd.h>
 
 // exports for the filter
 extern "C" {
@@ -67,18 +66,18 @@ bool filter_init(const char * args, void** filter_ctx) {
     targetInfo = NetworkTable::GetTable("cameraTarget");
 
     // Read camera settings
-    char file[] = __FILE__;
-    chdir(basename(file));
 #if DIRECTION_BOTH || DIRECTION_FRONT
-    cv::FileStorage fs("front_camera_data.xml", cv::FileStorage::READ); // Read the settings
+    char configFile[] = "front_camera_data.xml";
 #elif DIRECTION_BACK
-    cv::FileStorage fs("back_camera_data.xml", cv::FileStorage::READ);
+    char configFile[] = "back_camera_data.xml";
 #else
     #error Camera direction not defined
 #endif
+    cv::FileStorage fs(configFile, cv::FileStorage::READ); // Read the settings
     if (!fs.isOpened())
     {
-        std::cout << "Could not open the configuration file: \"out_camera_data.xml\"\n";
+        std::cout << "Could not open the configuration file: \"";
+        std::cout << configFile << "\"\n";
         return -1;
     }
 
@@ -146,16 +145,16 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         if (area < 30.0) continue;
 
         // Ignore if too rotated (currently commented out to keep it working properly)
-        if (box.angle < -15 || box.angle > 15) continue;
+        //if (box.angle < -15 || box.angle > 15) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 85.0) continue;
+        if (solidity < 80.0) continue;
 
         // Ignore if wrong shape
         ratio = box.size.width / box.size.height;
-        if (ratio > 0.7) continue;
+        //if (ratio > .5) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -216,22 +215,21 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
     std::sort(targets.begin(), targets.end(), bigToLittle);
 
+    //Calculate distance from lift.
+    targetInfo->PutNumber(
+        "liftDistance",
+        26.34674 + 335.5898 / pow(2, targets[0].width / 22.12821)
+    );
+
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
         "liftCenter",
         targets[0].x + targets[0].width / 2.0 - output.cols / 2.0
     );
 
-    //Calculate distance from lift. Not always accurate, but consistent.
-    targetInfo->PutNumber(
-        "liftDistance",
-        98.6132 * pow(2.71828182845904523536, -0.00715589 * targets[0].width)
-    );
-
 #if defined(DEBUG)
     targetInfo->PutNumber("Width", targets[0].width);
-    targetInfo->PutNumber("Left", targets[0].x);
-    targetInfo->PutNumber("Right", targets[0].x + targets[0].width);
+    targetInfo->PutNumber("Height", targets[0].height);
 #endif
 
     // Highlight targeted lift on screen
