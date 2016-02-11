@@ -54,6 +54,7 @@ namespace color {
     cv::Scalar black(0, 0, 0);
     cv::Scalar white(255, 255, 255);
     cv::Scalar gray(127, 127, 127);
+    cv::Scalar cyan(255, 255, 0);
 }
 
 /**
@@ -123,10 +124,13 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
     {
         cv::line(corrected, ropeLine1, ropeLine2, color::orange, 15);
     }
+    else
+    {
+        //Draws reticle on screen to aid in aligning robot to shoot balls.
+        cv::rectangle(corrected, reticle, color::yellow, 2);
+        cv::drawMarker(corrected, cv::Point(350, 125), color::yellow);
+    }
 #endif
-
-    //Draws reticle on screen to aid in aligning robot to shoot balls.
-    cv::rectangle(corrected, reticle, color::yellow, 2);
 
     cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
 }
@@ -149,23 +153,23 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         box = cv::minAreaRect(contour);
 
         // Ignore if too skinny
-        if (box.size.width < 10.0 || box.size.height < 10.0) continue;
+        if (box.size.width < 5.0 || box.size.height < 8.0) continue;
 
         // Ignore if too small
         area = cv::contourArea(contour);
-        if (area < 50.0) continue;
+        if (area < 30.0) continue;
 
-        // Ignore if too rotated (currently commented out to keep it working properly)
+        // Ignore if too rotated
         if (box.angle < -15 || box.angle > 15) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 80.0) continue;
+        if (solidity < 70.0) continue;
 
         // Ignore if wrong shape
         ratio = box.size.width / box.size.height;
-        if (ratio < .3 || ratio > .7) continue;
+        if (ratio < .2 || ratio > .7) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -234,7 +238,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 0;
+    skew = 62.38539 + 2.99158569 * (1 - pow(2.718281828459, 0.03162349 * distance));
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
@@ -248,7 +252,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 #endif
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, targets[0], color::pink, 3);
+    cv::rectangle(output, targets[0], color::cyan, 3);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
