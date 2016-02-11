@@ -5,6 +5,7 @@
 #include <vector>
 #include <deque>
 #include <opencv2/opencv.hpp>
+#include <cmath>
 
 // exports for the filter
 extern "C" {
@@ -31,11 +32,13 @@ std::vector<int> upperHSVthreshold = {255, 20, 255};
 cv::Mat cameraMatrix, distCoeffs;
 
 namespace color {
+    cv::Scalar gold(50, 215, 255);
+    cv::Scalar turquoise(208, 224, 64);
     cv::Scalar red(0, 0, 255);
     cv::Scalar green(0, 255, 0);
     cv::Scalar blue(255, 0, 0);
     cv::Scalar yellow(0, 255, 255);
-    cv::Scalar purple(255, 0, 127);
+    cv::Scalar pink(255, 0, 255);
     cv::Scalar orange(0, 127, 255);
     cv::Scalar black(0, 0, 0);
     cv::Scalar white(255, 255, 255);
@@ -90,12 +93,20 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
         CV_CHAIN_APPROX_SIMPLE
     );
 
-#ifdef DEBUG
+#if defined(DEBUG)
     cv::drawContours(corrected, contours, -1, color::blue);
 #endif
 
+#if DIRECTION_BOTH
     findBoiler(corrected, contours);
     findLift(corrected, contours);
+#elif DIRECTION_FRONT
+    findBoiler(corrected, contours);
+#elif DIRECTION_BACK
+    findLift(corrected, contours);
+#else
+    #error No camera direction defined
+#endif
 
     cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
 }
@@ -156,8 +167,8 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-#ifdef DEBUG
-        cv::rectangle(output, box1, color::purple, 1);
+#if defined(DEBUG)
+        cv::rectangle(output, box1, color::green, 1);
 #endif
 
         for (auto box2 : matchingBoxes)
@@ -183,9 +194,9 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         }
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     // Draw last rectangle
-    cv::rectangle(output, matchingBoxes.front(), color::purple, 1);
+    cv::rectangle(output, matchingBoxes.front(), color::green, 1);
 #endif
 
     if (lifts.size() == 0)
@@ -202,12 +213,10 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         lifts[0].x + lifts[0].width / 2.0 - output.cols / 2.0
     );
 
-/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
-    //GET DISTANCE WORKING! (currently uses made up slope and intercept)
-    double slope = 0.5;
-    double intercept = 1;
-    targetInfo->PutNumber("liftDistance", slope * lifts[0].width + intercept);
-/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
+    //Calculate distance from lift. Not always accurate, but consistent.
+    double A = 98.6132;
+    double B = -0.00715589;
+    targetInfo->PutNumber("liftDistance",  int(A * pow(2.71828182845904523536, B * lifts[0].width)));
 
     // Debugging
     targetInfo->PutNumber("Width", lifts[0].width);
@@ -215,7 +224,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     targetInfo->PutNumber("Right", lifts[0].x + lifts[0].width);
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, lifts[0], color::green, 4);
+    cv::rectangle(output, lifts[0], color::pink, 10);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
@@ -264,7 +273,7 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-#ifdef DEBUG
+#if defined(DEBUG)
         cv::rectangle(output, box1, color::orange, 1);
 #endif
 
@@ -291,7 +300,7 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         }
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     // Draw last rectangle
     cv::rectangle(output, matchingBoxes.front(), color::orange, 1);
 #endif
@@ -318,12 +327,12 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
 
     // Debugging
-/*    targetInfo->PutNumber("width", boilers[0].width);
+    targetInfo->PutNumber("boilerWidth", boilers[0].width);
     targetInfo->PutNumber("top", boilers[0].y);
     targetInfo->PutNumber("bottom", boilers[0].y + boilers[0].height);
-*/
+
     // Highlight targeted lift on screen
-    cv::rectangle(output, boilers[0], color::red, 4);
+    cv::rectangle(output, boilers[0], color::turquoise, 10);
 }
 
 /**
