@@ -117,7 +117,7 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 #if DIRECTION_BOTH || DIRECTION_BACK
     findBoiler(corrected, contours);
 
-    if (targetInfo->getBool("climbing", true))
+    if (targetInfo->GetBoolean("climbing", true))
     {
         cv::line(corrected, ropeLine1, ropeLine2, color::orange, 2);
     }
