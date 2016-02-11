@@ -29,6 +29,12 @@ std::shared_ptr<NetworkTable> targetInfo;
 
 std::vector<int> lowerHSVthreshold = {0, 0, 235};
 std::vector<int> upperHSVthreshold = {255, 20, 255};
+std::vector<std::vector<cv::Point>> contours;
+std::vector<cv::Vec4i> hierarchy;
+std::vector<cv::Rect> lifts;
+std::vector<cv::Point> hull;
+std::deque<cv::Rect> matchingBoxes;
+std::vector<cv::Rect> boilers;
 cv::Mat cameraMatrix, distCoeffs;
 
 namespace color {
@@ -83,8 +89,6 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
     cv::cvtColor(corrected, image, CV_BGR2HSV);
     cv::inRange(image, lowerHSVthreshold, upperHSVthreshold, image);
 
-    std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hierarchy;
     cv::findContours(
         image,
         contours,
@@ -123,8 +127,8 @@ bool bigToLittle(cv::Rect i, cv::Rect j)
 
 void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 {
-    std::vector<cv::Point> hull;
-    std::deque<cv::Rect> matchingBoxes;
+    matchingBoxes.clear();
+
     for (std::vector<cv::Point> contour: contours)
     {
         cv::RotatedRect box = cv::minAreaRect(contour);
@@ -161,7 +165,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     // Check if any two remaining rectangles create a lift target
     std::sort(matchingBoxes.begin(), matchingBoxes.end(), leftToRight);
 
-    std::vector<cv::Rect> lifts;
+    lifts.clear();
     while (matchingBoxes.size() > 1)
     {
         auto box1 = matchingBoxes.front();
@@ -224,13 +228,13 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     targetInfo->PutNumber("Right", lifts[0].x + lifts[0].width);
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, lifts[0], color::pink, 10);
+    cv::rectangle(output, lifts[0], color::pink, 3);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 {
-    std::vector<cv::Point> hull;
-    std::deque<cv::Rect> matchingBoxes;
+    matchingBoxes.clear();
+
     for (std::vector<cv::Point> contour: contours)
     {
         cv::RotatedRect box = cv::minAreaRect(contour);
@@ -248,7 +252,7 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         double solid = 100 * area / cv::contourArea(hull);
-        if (solid < 45.0) continue;
+        if (solid < 50.0) continue;
 
         // Ignore if wrong shape
         double ratio = box.size.width / box.size.height;
@@ -267,7 +271,7 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     // Check if any two remaining rectangles create a lift target
     std::sort(matchingBoxes.begin(), matchingBoxes.end(), leftToRight);
 
-    std::vector<cv::Rect> boilers;
+    boilers.clear();
     while (matchingBoxes.size() > 1)
     {
         auto box1 = matchingBoxes.front();
@@ -332,7 +336,7 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     targetInfo->PutNumber("bottom", boilers[0].y + boilers[0].height);
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, boilers[0], color::turquoise, 10);
+    cv::rectangle(output, boilers[0], color::turquoise, 3);
 }
 
 /**
