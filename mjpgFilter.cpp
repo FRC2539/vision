@@ -38,8 +38,8 @@ std::vector<cv::Rect> targets;
 cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
-cv::Point ropeLine1(10, 50), ropeLine2(10, 200);
-double area, solidity, ratio;
+cv::Point ropeLine1(80, 20), ropeLine2(20, 440);
+double area, solidity, ratio, distance, skew;
 
 namespace color {
     cv::Scalar gold(50, 215, 255);
@@ -49,7 +49,7 @@ namespace color {
     cv::Scalar blue(255, 0, 0);
     cv::Scalar yellow(0, 255, 255);
     cv::Scalar pink(255, 0, 255);
-    cv::Scalar orange(0, 127, 255);
+    cv::Scalar orange(0, 100, 255);
     cv::Scalar black(0, 0, 0);
     cv::Scalar white(255, 255, 255);
     cv::Scalar gray(127, 127, 127);
@@ -117,9 +117,9 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 #if DIRECTION_BOTH || DIRECTION_BACK
     findBoiler(corrected, contours);
 
-    if (targetInfo->GetBoolean("climbing", true))
+    if (targetInfo->GetBoolean("climbing", false))
     {
-        cv::line(corrected, ropeLine1, ropeLine2, color::orange, 2);
+        cv::line(corrected, ropeLine1, ropeLine2, color::orange, 15);
     }
 #endif
 
@@ -222,15 +222,19 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     std::sort(targets.begin(), targets.end(), bigToLittle);
 
     //Calculate distance from lift.
+    distance = 26.34674 + 335.5898 / pow(2, targets[0].width / 22.12821);
     targetInfo->PutNumber(
         "liftDistance",
-        26.34674 + 335.5898 / pow(2, targets[0].width / 22.12821)
+        distance
     );
+
+    // Insert formula for skew here
+    skew = 2.294607 + 191.472 * pow(2.7182818284590452353602874713527, -0.04040384 * distance);
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
         "liftCenter",
-        targets[0].x + targets[0].width / 2.0 - output.cols / 2.0
+        targets[0].x + targets[0].width / 2.0 - output.cols / 2.0 - skew
     );
 
 #if defined(DEBUG)
