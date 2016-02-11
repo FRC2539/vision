@@ -21,12 +21,14 @@ struct Target {
 
 // Forward-declare finder functions
 void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours);
+void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours);
 
 // Globals are better than passing by pointer-to-pointer
 std::shared_ptr<NetworkTable> targetInfo;
 
-std::vector<int> lowerHSVthreshold = {70, 6, 70};
-std::vector<int> upperHSVthreshold = {108, 82, 76};
+std::vector<int> lowerHSVthreshold = {0, 0, 99};
+std::vector<int> upperHSVthreshold = {255, 10, 101};
+cv::Mat cameraMatrix, distCoeffs;
 
 namespace color {
     cv::Scalar red(0, 0, 255);
@@ -51,6 +53,18 @@ bool filter_init(const char * args, void** filter_ctx) {
     //NetworkTable::SetUpdateRate(0.01);
     targetInfo = NetworkTable::GetTable("cameraTarget");
 
+    // Read camera settings
+    cv::FileStorage fs("out_camera_data.xml", cv::FileStorage::READ); // Read the settings
+    if (!fs.isOpened())
+    {
+        std::cout << "Could not open the configuration file: \"out_camera_data.xml\"\n";
+        return -1;
+    }
+
+    fs["Camera_Matrix"] >> cameraMatrix;
+    fs["Distortion_Coefficients"] >> distCoeffs;
+    fs.release();
+
     return true;
 }
 
@@ -58,9 +72,11 @@ bool filter_init(const char * args, void** filter_ctx) {
     Called by the OpenCV plugin upon each frame
 */
 void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
-    cv::Mat image, image2;
+    cv::Mat image, image2, corrected;
 
-    cv::normalize(src, image, 75.0, 0.0, cv::NORM_INF);
+    cv::undistort(src, corrected, cameraMatrix, distCoeffs);
+
+    cv::normalize(corrected, image, 100.0, 0.0, cv::NORM_INF);
 
     cv::bilateralFilter(image, image2, -1, 1, 1);
 
@@ -87,11 +103,12 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
         CV_CHAIN_APPROX_SIMPLE
     );
 
-    cv::drawContours(src, contours, -1, color::blue);
+    cv::drawContours(corrected, contours, -1, color::blue);
 
-    findLift(src, contours);
+    findBoiler(corrected, contours);
+    findLift(corrected, contours);
 
-    cv::resize(src, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
+    cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
 }
 
 void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
@@ -175,16 +192,16 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         if (area < 30.0) continue;
 
         // Ignore if too rotated (currently commented out to keep it working properly)
-        //if (box.angle < -10 || box.angle > 10) continue;
+        //if (box.angle < -15 || box.angle > 15) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         double solid = 100 * area / cv::contourArea(hull);
-        if (solid < 70.0) continue;
+        if (solid < 80.0) continue;
 
         // Ignore if wrong shape
         double ratio = box.size.width / box.size.height;
-        if (ratio > 0.75) continue;
+//        if (ratio > 0.7) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -205,15 +222,15 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-        cv::rectangle(output, box1, color::green, 2);
+        cv::rectangle(output, box1, color::red, 1);
 
         for (auto box2 : matchingBoxes)
         {
             // Are the boxes next to each other?
-            if (std::abs(box1.y - box2.y) > .1 * box1.height) continue;
+            if (std::abs(box1.y - box2.y) > .15 * box1.height) continue;
 
             // Are the boxes the same size?
-            if (std::abs(box1.height - box2.height) > .1 * box1.height) continue;
+            if (std::abs(box1.height - box2.height) > .15 * box1.height) continue;
 
             // Are the boxes the right distance apart?
             std::vector<cv::Point> combined;
@@ -230,7 +247,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         }
     }
     // Draw last rectangle
-    cv::rectangle(output, matchingBoxes.front(), color::green, 2);
+    cv::rectangle(output, matchingBoxes.front(), color::red, 1);
 
     if (lifts.size() == 0)
     {
@@ -259,12 +276,110 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     targetInfo->PutNumber("Right", lifts[0].x + lifts[0].width);
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, lifts[0], color::yellow, 3);
+    cv::rectangle(output, lifts[0], color::orange, 2);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 {
+    std::vector<cv::Point> hull;
+    std::deque<cv::Rect> matchingBoxes;
+    for (std::vector<cv::Point> contour: contours)
+    {
+        cv::RotatedRect box = cv::minAreaRect(contour);
 
+        // Ignore if too skinny
+        if (box.size.width < 2.0 || box.size.height < 2.0) continue;
+
+        // Ignore if too small
+        double area = cv::contourArea(contour);
+        if (area < 30.0) continue;
+
+        // Ignore if too rotated (currently commented out to keep it working properly)
+        //if (box.angle < -15 || box.angle > 15) continue;
+
+        // Ignore if too concave
+        cv::convexHull(cv::Mat(contour, true), hull);
+        double solid = 100 * area / cv::contourArea(hull);
+        if (solid < 70.0) continue;
+
+        // Ignore if wrong shape
+        double ratio = box.size.width / box.size.height;
+//        if (ratio > 0.7) continue;
+
+        matchingBoxes.push_back(cv::boundingRect(contour));
+    }
+
+    // We need at least 2 boxes to make a target
+    if (matchingBoxes.size() < 2)
+    {
+        targetInfo->PutBoolean("boilerVisible", false);
+        return;
+    }
+
+    // Check if any two remaining rectangles create a lift target
+    std::sort(matchingBoxes.begin(), matchingBoxes.end(), leftToRight);
+
+    std::vector<cv::Rect> boilers;
+    while (matchingBoxes.size() > 1)
+    {
+        auto box1 = matchingBoxes.front();
+        matchingBoxes.pop_front();
+
+        cv::rectangle(output, box1, color::green, 1);
+
+        for (auto box2 : matchingBoxes)
+        {
+            // Are the boxes on top of each other?
+            if (std::abs(box1.x - box2.x) > .15 * box1.width) continue;
+
+            // Are the boxes the same size?
+            if (std::abs(box1.width - box2.width) > .2 * box1.width) continue;
+
+            // Are the boxes the right distance apart?
+            std::vector<cv::Point> combined;
+            combined.push_back(cv::Point(box1.x, box1.y));
+            combined.push_back(cv::Point(box1.x, box1.y + box1.height));
+            combined.push_back(cv::Point(box2.x + box2.width, box2.y + box2.height));
+            combined.push_back(cv::Point(box2.x + box2.width, box2.y));
+
+            cv::Rect boiler = cv::boundingRect(combined);
+            double ratio = boiler.width / boiler.height;
+            if (ratio > 3 || ratio < 1) continue;
+
+            boilers.push_back(boiler);
+        }
+    }
+    // Draw last rectangle
+    cv::rectangle(output, matchingBoxes.front(), color::green, 1);
+
+    if (boilers.size() == 0)
+    {
+        targetInfo->PutBoolean("boilerVisible", false);
+        return;
+    }
+
+    std::sort(boilers.begin(), boilers.end(), bigToLittle);
+
+    targetInfo->PutBoolean("boilerVisible", true);
+    targetInfo->PutNumber(
+        "boilerCenter",
+        boilers[0].x + boilers[0].width / 2.0 - output.cols / 2.0
+    );
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
+    //GET DISTANCE WORKING! (currently uses made up slope and intercept)
+    double slope = 0.5;
+    double intercept = 1;
+    targetInfo->PutNumber("boilerDistance", slope * boilers[0].width + intercept);
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
+
+    // Debugging
+    targetInfo->PutNumber("width", boilers[0].width);
+    targetInfo->PutNumber("top", boilers[0].y);
+    targetInfo->PutNumber("bottom", boilers[0].y + boilers[0].height);
+
+    // Highlight targeted lift on screen
+    cv::rectangle(output, boilers[0], color::yellow, 2);
 }
 
 /**
