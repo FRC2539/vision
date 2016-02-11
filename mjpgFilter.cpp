@@ -39,7 +39,7 @@ cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
 cv::Point ropeLine1(170, 20), ropeLine2(30, 440);
-cv::Rect reticle(cv::Point(250, 50), cv::Point(450, 200));
+cv::Rect reticle(cv::Point(250, 10), cv::Point(450, 160));
 double area, solidity, ratio, distance, skew;
 
 namespace color {
@@ -128,7 +128,14 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
     {
         //Draws reticle on screen to aid in aligning robot to shoot balls.
         cv::rectangle(corrected, reticle, color::yellow, 2);
-        cv::drawMarker(corrected, cv::Point(350, 125), color::yellow);
+        cv::drawMarker(
+            corrected,
+            cv::Point(350, 85),
+            color::yellow,
+            cv::MARKER_CROSS,
+            20,
+            2
+        );
     }
 #endif
 
@@ -164,24 +171,24 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         // Use the width and height to figure out if the long side is vertical
         if (box.size.width < box.size.height)
         {
-            if (box.angle < -15) continue;
+            if (box.angle < -10) continue;
 
             ratio = box.size.width / box.size.height;
         }
         else
         {
-            if (box.angle > -75) continue;
+            if (box.angle > -80) continue;
 
             ratio = box.size.height / box.size.width;
         }
 
-        // Ignore if wrong shape
-        if (ratio < .2 || ratio > .7) continue;
+        // Ignore if wrong shape (2" x 5")
+        if (ratio < .3 || ratio > .5) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 70.0) continue;
+        if (solidity < 90.0) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -222,7 +229,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
             combined.push_back(cv::Point(box2.x + box2.width, box2.y));
 
             target = cv::boundingRect(combined);
-            ratio = target.width / target.height;
+            ratio = target.width / target.height; // (10" x 5")
             if (ratio > 3 || ratio < 1) continue;
 
             targets.push_back(target);
