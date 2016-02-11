@@ -39,6 +39,7 @@ cv::Mat cameraMatrix, distCoeffs, buffer, corrected;
 cv::RotatedRect box;
 cv::Rect box1, target;
 cv::Point ropeLine1(170, 20), ropeLine2(30, 440);
+cv::Rect reticle(cv::Point(250, 50), cv::Point(450, 200));
 double area, solidity, ratio, distance, skew;
 
 namespace color {
@@ -60,7 +61,7 @@ namespace color {
     filter_process function, and should be freed by the filter_free function
 */
 bool filter_init(const char * args, void** filter_ctx) {
-   
+
     NetworkTable::SetTeam(2539);
     NetworkTable::SetClientMode();
     //NetworkTable::SetUpdateRate(0.01);
@@ -68,7 +69,8 @@ bool filter_init(const char * args, void** filter_ctx) {
 
     // Read camera settings
 #if DIRECTION_BOTH || DIRECTION_FRONT
-    char configFile[] = "front_camera_data.xml";
+    //char configFile[] = "front_camera_data.xml";
+    char configFile[] = "back_camera_data.xml";
 #elif DIRECTION_BACK
     char configFile[] = "back_camera_data.xml";
 #else
@@ -123,6 +125,9 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
     }
 #endif
 
+    //Draws reticle on screen to aid in aligning robot to shoot balls.
+    cv::rectangle(corrected, reticle, color::yellow, 2);
+
     cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
 }
 
@@ -144,14 +149,14 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         box = cv::minAreaRect(contour);
 
         // Ignore if too skinny
-        if (box.size.width < 2.0 || box.size.height < 2.0) continue;
+        if (box.size.width < 10.0 || box.size.height < 10.0) continue;
 
         // Ignore if too small
         area = cv::contourArea(contour);
-        if (area < 30.0) continue;
+        if (area < 50.0) continue;
 
         // Ignore if too rotated (currently commented out to keep it working properly)
-        //if (box.angle < -15 || box.angle > 15) continue;
+        if (box.angle < -15 || box.angle > 15) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
@@ -160,7 +165,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
         // Ignore if wrong shape
         ratio = box.size.width / box.size.height;
-        //if (ratio > .5) continue;
+        if (ratio < .3 || ratio > .7) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -229,7 +234,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 2731.309 * pow(distance, -1.122057);
+    skew = 0;
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
