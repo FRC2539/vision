@@ -172,19 +172,19 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
         // Ignore if too small
         double area = cv::contourArea(contour);
-        if (area < 40.0) continue;
+        if (area < 30.0) continue;
 
-        // Ignore if too rotated
-        if (box.angle < -10 || box.angle > 10) continue;
+        // Ignore if too rotated (currently commented out to keep it working properly)
+        //if (box.angle < -10 || box.angle > 10) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         double solid = 100 * area / cv::contourArea(hull);
-        if (solid < 75.0) continue;
+        if (solid < 70.0) continue;
 
         // Ignore if wrong shape
         double ratio = box.size.width / box.size.height;
-        if (ratio > 0.4) continue;
+        if (ratio > 0.75) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -205,7 +205,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-        cv::rectangle(output, box1, color::purple);
+        cv::rectangle(output, box1, color::green, 2);
 
         for (auto box2 : matchingBoxes)
         {
@@ -224,13 +224,13 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
             cv::Rect lift = cv::boundingRect(combined);
             double ratio = lift.width / lift.height;
-            if (ratio > 3 || ratio < 1.5) continue;
+            if (ratio > 3 || ratio < 1) continue;
 
             lifts.push_back(lift);
         }
     }
     // Draw last rectangle
-    cv::rectangle(output, matchingBoxes.front(), color::purple);
+    cv::rectangle(output, matchingBoxes.front(), color::green, 2);
 
     if (lifts.size() == 0)
     {
@@ -254,11 +254,12 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*/
 
     // Debugging
+    targetInfo->PutNumber("Width", lifts[0].width);
     targetInfo->PutNumber("Left", lifts[0].x);
     targetInfo->PutNumber("Right", lifts[0].x + lifts[0].width);
 
     // Highlight targeted lift on screen
-    cv::rectangle(output, lifts[0], color::orange, 2);
+    cv::rectangle(output, lifts[0], color::yellow, 3);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
