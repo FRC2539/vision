@@ -61,6 +61,9 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 		CV_CHAIN_APPROX_SIMPLE
 	);
 
+    std::vector<int> green = {0, 255, 0};
+    cv::drawContours(dst, contours, -1, green);
+
 	std::vector<Target> targets;
 	for (auto contour : contours)
 	{
