@@ -61,9 +61,14 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 		CV_CHAIN_APPROX_SIMPLE
 	);
 
-    std::vector<int> green = {0, 255, 0};
+    cv::Scalar green(0, 255, 0);
     cv::drawContours(dst, contours, -1, green);
 
+    findTower(dst, contours);
+}
+
+void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
+{
 	std::vector<Target> targets;
 	for (auto contour : contours)
 	{
@@ -114,7 +119,17 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 	targetInfo->PutNumber(
 		"distance",
 		22.837262 - 0.210646 * targets[bestIndex].width
-	);
+	)
+}
+
+void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
+{
+
+}
+
+void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
+{
+
 }
 
 /**
