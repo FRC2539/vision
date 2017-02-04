@@ -1,8 +1,5 @@
 /**
-    Example C++ OpenCV filter plugin that doesn't do anything. Copy/paste this
-    to create your own awesome filter plugins for mjpg-streamer.
-    
-    At the moment, only the input_opencv.so plugin supports filter plugins.
+    An OpenCV plugin to find targets for Steamworks
 */
 #include <networktables/NetworkTable.h>
 #include <vector>
@@ -21,11 +18,14 @@ struct Target {
     int position;
 };
 
+// Forward-declare finder functions
+void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours);
+
 // Globals are better than passing by pointer-to-pointer
 std::shared_ptr<NetworkTable> targetInfo;
-    
-std::vector<int> lowerHSVthreshold = {41, 0, 149};
-std::vector<int> upperHSVthreshold = {180, 203, 255};
+
+std::vector<int> lowerHSVthreshold = {70, 6, 70};
+std::vector<int> upperHSVthreshold = {108, 82, 76};
 double targetAspect = 12.0/20.0;
 
 /**
@@ -36,6 +36,7 @@ bool filter_init(const char * args, void** filter_ctx) {
    
     NetworkTable::SetTeam(2539);
     NetworkTable::SetClientMode();
+    NetworkTable::SetUpdateRate(0.01);
     targetInfo = NetworkTable::GetTable("cameraTarget");
 
     return true;
@@ -47,9 +48,24 @@ bool filter_init(const char * args, void** filter_ctx) {
 void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
     dst=src;
 
-    cv::Mat image;
-    cv::cvtColor(src, image, CV_BGR2HSV);
+    cv::Mat image, image2;
+
+    cv::normalize(src, image, 75.0, 0.0, cv::NORM_INF);
+
+    cv::bilateralFilter(image, image2, -1, 1, 1);
+
+    cv::cvtColor(image2, image, CV_BGR2HSV);
     cv::inRange(image, lowerHSVthreshold, upperHSVthreshold, image);
+
+	cv::Mat cvErodeKernel;
+	cv::Point cvErodeAnchor(-1, -1);
+	cv::Scalar cvErodeBorderValue(-1);
+    cv::erode(image, image2, cvErodeKernel, cvErodeAnchor, 2, cv::BORDER_CONSTANT, cvErodeBorderValue);
+
+	cv::Mat cvDilateKernel;
+	cv::Point cvDilateAnchor(-1, -1);
+	cv::Scalar cvDilateBorderValue(-1);
+    cv::dilate(image2, image, cvDilateKernel, cvDilateAnchor, 5, cv::BORDER_CONSTANT, cvDilateBorderValue);
 
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
@@ -61,10 +77,10 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
         CV_CHAIN_APPROX_SIMPLE
     );
 
-    cv::Scalar green(0, 255, 0);
+    cv::Scalar green(255, 0, 0);
     cv::drawContours(dst, contours, -1, green);
 
-    findTower(dst, contours);
+    findLift(dst, contours);
 }
 
 void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
@@ -90,7 +106,7 @@ void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
         Target currentTarget = Target();
         currentTarget.width = box.size.width;
-        currentTarget.position = box.center.x - image.cols / 2.0;
+        currentTarget.position = box.center.x - output.cols / 2.0;
         currentTarget.error = error;
 
         targets.push_back(currentTarget);
@@ -119,12 +135,55 @@ void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     targetInfo->PutNumber(
         "distance",
         22.837262 - 0.210646 * targets[bestIndex].width
-    )
+    );
 }
 
 void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 {
+    std::vector<cv::Point> hull;
+    std::vector<Target> targets;
+    std::vector<std::vector<cv::Point>> filteredContours;
+    for (std::vector<cv::Point> contour: contours)
+    {
+        cv::Rect bb = boundingRect(contour);
+        if (bb.width < 2.0) continue;
+        if (bb.height < 2.0) continue;
+        double area = cv::contourArea(contour);
+        if (area < 80.0) continue;
+        cv::convexHull(cv::Mat(contour, true), hull);
+        double solid = 100 * area / cv::contourArea(hull);
+        if (solid < 75.0) continue;
+        double ratio = bb.width / bb.height;
+        if (ratio < 0.0 || ratio > 0.2) continue;
 
+        cv::RotatedRect box = cv::minAreaRect(contour);
+        Target currentTarget = Target();
+        currentTarget.width = box.size.width;
+        currentTarget.position = box.center.x - output.cols / 2.0;
+
+        filteredContours.push_back(contour);
+        targets.push_back(currentTarget);
+    }
+
+    if (targets.size() == 0)
+    {
+        targetInfo->PutBoolean("liftVisible", false);
+        return;
+    }
+
+    targetInfo->PutBoolean("liftVisible", true);
+    targetInfo->PutNumber("liftCenter", (targets[0].position + targets[1].position) / 2);
+
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    //GET DISTANCE WORKING! (currently wrong)
+    targetInfo->PutNumber("distance", std::abs(targets[0].position - targets[1].position));
+"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+    targetInfo->PutNumber("Left", targets[0].position);
+    targetInfo->PutNumber("Right", targets[1].position);
+
+    cv::Scalar purple(255, 0, 255);
+    cv::drawContours(output, filteredContours, -1, purple, 2);
 }
 
 void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
@@ -135,6 +194,4 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 /**
     Called when the input plugin is cleaning up
 */
-void filter_free(void* filter_ctx) {
-    // empty
-}
+void filter_free(void* filter_ctx) {}
