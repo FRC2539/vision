@@ -77,23 +77,9 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
 
     cv::undistort(src, corrected, cameraMatrix, distCoeffs);
 
-    //cv::normalize(corrected, image, 100.0, 0.0, cv::NORM_INF);
-
-    //cv::bilateralFilter(image, image2, -1, 1, 1);
-
     cv::cvtColor(corrected, image, CV_BGR2HSV);
     cv::inRange(image, lowerHSVthreshold, upperHSVthreshold, image);
 
-/*    cv::Mat cvErodeKernel;
-    cv::Point cvErodeAnchor(-1, -1);
-    cv::Scalar cvErodeBorderValue(-1);
-    cv::erode(image, image2, cvErodeKernel, cvErodeAnchor, 2, cv::BORDER_CONSTANT, cvErodeBorderValue);
-
-    cv::Mat cvDilateKernel;
-    cv::Point cvDilateAnchor(-1, -1);
-    cv::Scalar cvDilateBorderValue(-1);
-    cv::dilate(image2, image, cvDilateKernel, cvDilateAnchor, 3, cv::BORDER_CONSTANT, cvDilateBorderValue);
-*/
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
     cv::findContours(
@@ -104,67 +90,14 @@ void filter_process(void* filter_ctx, cv::Mat &src, cv::Mat &dst) {
         CV_CHAIN_APPROX_SIMPLE
     );
 
-    //cv::drawContours(corrected, contours, -1, color::blue);
+#ifdef DEBUG
+    cv::drawContours(corrected, contours, -1, color::blue);
+#endif
 
     findBoiler(corrected, contours);
     findLift(corrected, contours);
 
     cv::resize(corrected, dst, cv::Size(480, 360), 0, 0, cv::INTER_AREA);
-}
-
-void findTower(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
-{
-    std::vector<Target> targets;
-    for (auto contour : contours)
-    {
-        std::vector<cv::Point> hull;
-        cv::convexHull(cv::Mat(contour), hull);
-        if (cv::contourArea(hull) <= 200)
-        {
-            continue;
-        }
-
-        cv::RotatedRect box = cv::minAreaRect(contour);
-
-        double aspectRatio = box.size.height / box.size.width;
-        double error = std::abs(12.0/20.0 - aspectRatio);
-        if (error > 0.4)
-        {
-            continue;
-        }
-
-        Target currentTarget = Target();
-        currentTarget.width = box.size.width;
-        currentTarget.position = box.center.x - output.cols / 2.0;
-        currentTarget.error = error;
-
-        targets.push_back(currentTarget);
-    }
-
-    if (targets.size() == 0)
-    {
-        targetInfo->PutBoolean("hasTarget", false);
-        return;
-    }
-
-    int bestIndex = 0;
-    int bestError = 1;
-    int i = 0;
-    for (auto target : targets)
-    {
-        if (target.error < bestError)
-        {
-            bestIndex = i;
-        }
-        i++;
-    }
-
-    targetInfo->PutBoolean("hasTarget", true);
-    targetInfo->PutNumber("centerX", targets[bestIndex].position);
-    targetInfo->PutNumber(
-        "distance",
-        22.837262 - 0.210646 * targets[bestIndex].width
-    );
 }
 
 bool leftToRight(cv::Rect i, cv::Rect j)
@@ -223,7 +156,9 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-        //cv::rectangle(output, box1, color::purple, 1);
+#ifdef DEBUG
+        cv::rectangle(output, box1, color::purple, 1);
+#endif
 
         for (auto box2 : matchingBoxes)
         {
@@ -247,8 +182,11 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
             lifts.push_back(lift);
         }
     }
+
+#ifdef DEBUG
     // Draw last rectangle
-    //cv::rectangle(output, matchingBoxes.front(), color::purple, 1);
+    cv::rectangle(output, matchingBoxes.front(), color::purple, 1);
+#endif
 
     if (lifts.size() == 0)
     {
@@ -326,7 +264,9 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         auto box1 = matchingBoxes.front();
         matchingBoxes.pop_front();
 
-        //cv::rectangle(output, box1, color::orange, 1);
+#ifdef DEBUG
+        cv::rectangle(output, box1, color::orange, 1);
+#endif
 
         for (auto box2 : matchingBoxes)
         {
@@ -350,8 +290,11 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
             boilers.push_back(boiler);
         }
     }
+
+#ifdef DEBUG
     // Draw last rectangle
-    //cv::rectangle(output, matchingBoxes.front(), color::orange, 1);
+    cv::rectangle(output, matchingBoxes.front(), color::orange, 1);
+#endif
 
     if (boilers.size() == 0)
     {
