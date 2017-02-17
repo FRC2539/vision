@@ -6,6 +6,7 @@
 #include <deque>
 #include <opencv2/opencv.hpp>
 #include <cmath>
+#include <unistd.h>
 
 // exports for the filter
 extern "C" {
@@ -66,6 +67,8 @@ bool filter_init(const char * args, void** filter_ctx) {
     targetInfo = NetworkTable::GetTable("cameraTarget");
 
     // Read camera settings
+    char file[] = __FILE__;
+    chdir(basename(file));
 #if DIRECTION_BOTH || DIRECTION_FRONT
     cv::FileStorage fs("front_camera_data.xml", cv::FileStorage::READ); // Read the settings
 #elif DIRECTION_BACK
