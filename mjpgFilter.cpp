@@ -160,16 +160,28 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         if (area < 30.0) continue;
 
         // Ignore if too rotated
-        if (box.angle < -15 || box.angle > 15) continue;
+        // RotatedRects only have angles in the range [-90, 0)
+        // Use the width and height to figure out if the long side is vertical
+        if (box.size.width < box.size.height)
+        {
+            if (box.angle < -15) continue;
+
+            ratio = box.size.width / box.size.height;
+        }
+        else
+        {
+            if (box.angle > -75) continue;
+
+            ratio = box.size.height / box.size.width;
+        }
+
+        // Ignore if wrong shape
+        if (ratio < .2 || ratio > .7) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
         if (solidity < 70.0) continue;
-
-        // Ignore if wrong shape
-        ratio = box.size.width / box.size.height;
-        if (ratio < .2 || ratio > .7) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
