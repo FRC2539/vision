@@ -69,14 +69,9 @@ bool filter_init(const char * args, void** filter_ctx) {
     targetInfo = NetworkTable::GetTable("cameraTarget");
 
     // Read camera settings
-#if DIRECTION_BOTH || DIRECTION_FRONT
-    char configFile[] = "front_camera_data.xml";
-    //char configFile[] = "back_camera_data.xml";
-#elif DIRECTION_BACK
+
     char configFile[] = "back_camera_data.xml";
-#else
-    #error Camera direction not defined
-#endif
+
     cv::FileStorage fs(configFile, cv::FileStorage::READ); // Read the settings
     if (!fs.isOpened())
     {
@@ -168,7 +163,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         if (box.size.width < box.size.height)
         {
             // Ignore if too rotated
-            if (box.angle < -10) continue;
+            //if (box.angle < -10) continue;
 
             // Ignore if too skinny
             if (box.size.width < 5.0) continue;
@@ -187,12 +182,12 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         }
 
         // Ignore if wrong shape (2" x 5")
-        if (ratio < .3 || ratio > .5) continue;
+        //if (ratio < .3 || ratio > .5) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 80.0) continue;
+        if (solidity < 50.0) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
@@ -220,10 +215,10 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
         for (auto const &box2 : matchingBoxes)
         {
             // Are the boxes next to each other?
-            if (std::abs(box1.y - box2.y) > .2 * box1.height) continue;
+            if (std::abs(box1.y - box2.y) > .25 * box1.height) continue;
 
             // Are the boxes the same size?
-            if (std::abs(box1.height - box2.height) > .2 * box1.height) continue;
+            if (std::abs(box1.height - box2.height) > .25 * box1.height) continue;
 
             // Are the boxes the right distance apart?
             combined.clear();
@@ -253,7 +248,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
     std::sort(targets.begin(), targets.end(), bigToLittle);
 
-    //Calculate distance from lift.
+    //Calculate distance from lift. NEED TO RECALIBRATE!!!
     distance = 26.34674 + 335.5898 / pow(2, targets[0].width / 22.12821);
     targetInfo->PutNumber(
         "liftDistance",
