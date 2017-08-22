@@ -248,7 +248,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
     std::sort(targets.begin(), targets.end(), bigToLittle);
 
-    //Calculate distance from lift. NEED TO RECALIBRATE!!!
+    //Calculate distance from lift.
     distance = 26.34674 + 335.5898 / pow(2, targets[0].width / 22.12821);
     targetInfo->PutNumber(
         "liftDistance",
@@ -256,7 +256,7 @@ void findLift(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
     );
 
     // Insert formula for skew here
-    skew = 0;
+    skew = -0.6107898 * distance + 47.4026;
 
     targetInfo->PutBoolean("liftVisible", true);
     targetInfo->PutNumber(
