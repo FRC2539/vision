@@ -7,9 +7,9 @@ import numpy as np
 import math
 from networktables import NetworkTables
 
-hsvH = [0.0, 97]
-hsvS = [0.0, 9]
-hsvV = [74, 93]
+hsvH = [0.0, 255]
+hsvS = [0.0, 5]
+hsvV = [235, 255]
 
 hsvIn = None
 hsvOut = None
@@ -17,16 +17,17 @@ hsvOut = None
 contours = None
 filteredContours = None
 
-minArea = 80.0
+minArea = 40.0
 minWidth = 2.0
-maxWidth = 10000.0
 minHeight = 2.0
-maxHeight = 10000.0
 minSolidity = 60.0
-minRatio = 1.0
+minRatio = 0.3
 maxRatio = 1000.0
 
+red = (0, 0, 255)
+
 output = []
+contoursOut = []
 
 def main():
 
@@ -34,8 +35,8 @@ def main():
     NetworkTables.setClientMode();
     targetInfo = NetworkTables.getTable("cameraTarget")
 
-    frontCamera = cs.UsbCamera("usbcam", 0)
-    backCamera = cs.UsbCamera("usbcam", 1)
+    frontCamera = cs.UsbCamera("usbcam", 2)
+    backCamera = cs.UsbCamera("usbcam", 0)
 
     frontCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
     backCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
@@ -76,8 +77,10 @@ def main():
         frontCvSource.putFrame(filter_process(front))
         backCvSource.putFrame(filter_process(back))
 
+
 def filter_process(src):
 
+        output = []
 
         #HSV
         (hsvIn) = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
@@ -90,9 +93,9 @@ def filter_process(src):
         #Filter Contours
         for contour in contours:
             x,y,w,h = cv2.boundingRect(contour)
-            if (w < minWidth or w > maxWidth):
+            if (w < minWidth):
                 continue
-            if (h < minHeight or h > maxHeight):
+            if (h < minHeight):
                 continue
             area = cv2.contourArea(contour)
             if (area < minArea):
@@ -106,11 +109,7 @@ def filter_process(src):
                 continue
             output.append(contour)
 
-        #rect = cv2.minAreaRect(cnt)
-        #box = cv2.boxPoints(rect)
-        #box = np.int0(box)
-
-        return cv2.boundingRect(src, output, 0, (0,255,0), 2)
+        return cv2.drawContours(src, output, -1, red, 2, cv2.LINE_8)
 
 
 if __name__  == '__main__':
