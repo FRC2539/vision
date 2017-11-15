@@ -1,10 +1,9 @@
-
+#! /usr/bin/virtualenv python3
 #A vision program for FRC, written in python.
 
 import cscore as cs
 import cv2
 import numpy as np
-import math
 from networktables import NetworkTables
 
 hsvH = [0.0, 255]
@@ -17,26 +16,28 @@ hsvOut = None
 contours = None
 filteredContours = None
 
-minArea = 40.0
-minWidth = 2.0
-minHeight = 2.0
-minSolidity = 60.0
+minArea = 50.0
+minWidth = 5.0
+minHeight = 5.0
+minSolidity = 80.0
 minRatio = 0.3
-maxRatio = 1000.0
+maxRatio = 0.7
 
 red = (0, 0, 255)
 
-output = []
-contoursOut = []
-
 def main():
 
-    NetworkTables.setTeam(2539);
-    NetworkTables.setClientMode();
+    NetworkTables.setTeam(2539)
+    NetworkTables.setClientMode()
     targetInfo = NetworkTables.getTable("cameraTarget")
 
-    frontCamera = cs.UsbCamera("usbcam", 2)
-    backCamera = cs.UsbCamera("usbcam", 0)
+    fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
+    cameraMatrix = fs.getNode('Camera_Matrix').mat()
+    distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
+    fs.release()
+
+    frontCamera = cs.UsbCamera("usbcam", "/dev/video-front")
+    backCamera = cs.UsbCamera("usbcam", "/dev/video-back")
 
     frontCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
     backCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
@@ -48,8 +49,6 @@ def main():
     frontServer = cs.MjpegServer("cvhttpserver", 8081)
     frontServer.setSource(frontCvSource)
 
-    print("Front mjpg server listening at port 8081")
-
     backCvSink = cs.CvSink("cvsink")
     backCvSink.setSource(backCamera)
 
@@ -57,29 +56,30 @@ def main():
     backServer = cs.MjpegServer("cvhttpserver", 8082)
     backServer.setSource(backCvSource)
 
-    print("Back mjpg server listening at port 8082")
-
     front = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     back = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+    fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 
     while True:
 
         frontTime, front = frontCvSink.grabFrame(front)
-        backTime, back = backCvSink.grabFrame(back)
-
         if frontTime == 0:
-            print("error:", frontCvSink.getError())
-            continue
-        if backTime == 0:
-            print("error:", backCvSink.getError())
-            continue
+            print("Front camera error:", frontCvSink.getError())
+        else:
+            cv2.undistort(front, cameraMatrix, distortionCoefficients, dst=fixed)
+            frontCvSource.putFrame(filter_process(fixed))
 
-        frontCvSource.putFrame(filter_process(front))
-        backCvSource.putFrame(filter_process(back))
+        backTime, back = backCvSink.grabFrame(back)
+        if backTime == 0:
+            print("Back camera error:", backCvSink.getError())
+        else:
+            cv2.undistort(back, cameraMatrix, distortionCoefficients, dst=fixed)
+            backCvSource.putFrame(filter_process(fixed))
 
 
 def filter_process(src):
 
+        matches = []
         output = []
 
         #HSV
@@ -109,7 +109,17 @@ def filter_process(src):
                 continue
             output.append(contour)
 
-        return cv2.drawContours(src, output, -1, red, 2, cv2.LINE_8)
+        for box1 in output:
+            x1,y1,w1,h1 = cv2.boundingRect(box1)
+            for box2 in output:
+                x2,y2,w2,h2 = cv2.boundingRect(box2)
+                if abs(y1 - y2) > (.25 * h1):
+                    continue
+                if abs(h1 - h2) > (.25 * h1):
+                    continue
+                cv2.rectangle(src, (x1, y1), (x2 + w2, y2 + h2), red, 2)
+
+        return src
 
 
 if __name__  == '__main__':

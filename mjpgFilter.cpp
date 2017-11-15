@@ -285,12 +285,12 @@ void findBoiler(cv::Mat &output, std::vector<std::vector<cv::Point>> contours)
 
         // Ignore if too small
         area = cv::contourArea(contour);
-        if (area < 30.0) continue;
+        if (area < 25.0) continue;
 
         // Ignore if too concave
         cv::convexHull(cv::Mat(contour, true), hull);
         solidity = 100 * area / cv::contourArea(hull);
-        if (solidity < 50.0) continue;
+        if (solidity < 45.0) continue;
 
         matchingBoxes.push_back(cv::boundingRect(contour));
     }
