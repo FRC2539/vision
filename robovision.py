@@ -1,88 +1,91 @@
 
 #A vision program for FRC, written in python.
 
+import cscore as cs
 import cv2
-import numpy
+import numpy as np
 import math
 from networktables import NetworkTables
 
-def __init__(self):
+hsvH = [0.0, 97]
+hsvS = [0.0, 9]
+hsvV = [74, 93]
 
-        NetworkTables.setTeam(2539);
-        NetworkTables.setClientMode();
-        targetInfo = NetworkTables.getTable("cameraTarget")
+hsvIn = None
+hsvOut = None
 
-        hsvIn = source ###########################
-        hsvH = [0.0, 97]
-        hsvS = [0.0, 9]
-        hsvV = [74, 93]
+contours = None
+filteredContours = None
 
-        hsvIn = None
-        hsvOut = None
+minArea = 80.0
+minWidth = 2.0
+maxWidth = 10000.0
+minHeight = 2.0
+maxHeight = 10000.0
+minSolidity = 60.0
+minRatio = 1.0
+maxRatio = 1000.0
 
-        findIn = None
-
-        externalOnly = False
-        contours = None
-
-        filteredContours = contours
-        minArea = 80.0
-        minWidth = 2.0
-        maxWidth = 10000.0
-        minHeight = 2.0
-        maxHeight = 10000.0
-        solidity = [60, 100.0]
-        minRatio = 1.0
-        maxRatio = 1000.0
-
-        output = []
-
+output = []
 
 def main():
+
+    NetworkTables.setTeam(2539);
+    NetworkTables.setClientMode();
+    targetInfo = NetworkTables.getTable("cameraTarget")
+
     frontCamera = cs.UsbCamera("usbcam", 0)
+    backCamera = cs.UsbCamera("usbcam", 1)
+
     frontCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    backCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
 
-    mjpegServer = cs.MjpegServer("httpserver", 8081)
-    mjpegServer.setSource(camera)
+    frontCvSink = cs.CvSink("cvsink")
+    frontCvSink.setSource(frontCamera)
 
-    print("mjpg server listening at http://0.0.0.0:8081")
+    frontCvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    frontServer = cs.MjpegServer("cvhttpserver", 8081)
+    frontServer.setSource(frontCvSource)
 
-    cvsink = cs.CvSink("cvsink")
-    cvsink.setSource(frontCamera)
+    print("Front mjpg server listening at port 8081")
 
-    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    cvMjpegServer = cs.MjpegServer("cvhttpserver", 8082)
-    cvMjpegServer.setSource(cvSource)
+    backCvSink = cs.CvSink("cvsink")
+    backCvSink.setSource(backCamera)
 
-    print("OpenCV output mjpg server listening at http://0.0.0.0:8082")
+    backCvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    backServer = cs.MjpegServer("cvhttpserver", 8082)
+    backServer.setSource(backCvSource)
+
+    print("Back mjpg server listening at port 8082")
 
     front = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     back = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 
     while True:
 
-        front = cvsink.grabFrame(front)
-        back = cvsink.grabFrame(back)
+        frontTime, front = frontCvSink.grabFrame(front)
+        backTime, back = backCvSink.grabFrame(back)
 
-        if time == 0:
-            print("error:", cvsink.getError())
+        if frontTime == 0:
+            print("error:", frontCvSink.getError())
+            continue
+        if backTime == 0:
+            print("error:", backCvSink.getError())
             continue
 
-        filter_process(self, ###################################X
-        cvSource.putFrame(front)
-        cvSource.putFrame(back)
+        frontCvSource.putFrame(filter_process(front))
+        backCvSource.putFrame(filter_process(back))
 
-def filter_process(self, src):
+def filter_process(src):
 
-        hsvIn = src
 
         #HSV
-        (hsvOut) = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
-        (findIn) = cv2.inRange(hsvOut, (hsvH[0], hsvH[0], hsvV[0]),  (hsvH[1], hsvS[1], hsvV[1])
+        (hsvIn) = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
+        (hsvOut) = cv2.inRange(hsvIn, (hsvH[0], hsvS[0], hsvV[0]),  (hsvH[1], hsvS[1], hsvV[1]))
 
 
         #Find Contours
-        (contours) = cv2.findContours(findIn, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        img, contours, hierarchy = cv2.findContours(hsvOut, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         #Filter Contours
         for contour in contours:
@@ -95,14 +98,19 @@ def filter_process(self, src):
             if (area < minArea):
                 continue
             hull = cv2.convexHull(contour)
-            solid = 100 * area / cv2.contourArea(hull)
-            if (solid < solidity[0] or solid > solidity[1]):
+            solidity = 100 * area / cv2.contourArea(hull)
+            if (solidity < minSolidity):
                 continue
             ratio = (float)(w) / h
             if (ratio < minRatio or ratio > maxRatio):
                 continue
             output.append(contour)
-        return output
+
+        #rect = cv2.minAreaRect(cnt)
+        #box = cv2.boxPoints(rect)
+        #box = np.int0(box)
+
+        return cv2.boundingRect(src, output, 0, (0,255,0), 2)
 
 
 if __name__  == '__main__':
