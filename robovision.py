@@ -5,13 +5,33 @@ import cscore as cs
 import cv2
 import numpy as np
 from networktables import NetworkTables
+from collections import namedtuple
 
-hsvH = [0.0, 255]
-hsvS = [0.0, 5]
-hsvV = [235, 255]
+HSV = namedtuple('HSV', ('H', 'S', 'V'))
+Threshhold = namedtuple('Threshhold', ('min', 'max'))
+Color = namedtuple('Color', ('blue', 'green', 'red'))
 
-hsvIn = None
-hsvOut = None
+color = {
+    'red': Color(0, 0, 255),
+    'green': Color(0, 255, 0),
+    'blue': Color(255, 0, 0),
+    'yellow': Color(0, 255, 255),
+    'black': Color(0, 0, 0),
+    'white': Color(255, 255, 255),
+    'gray': Color(127, 127, 127)
+}
+
+tapeHSV = Threshhold(
+    HSV(100.35971223021582, 18.345323741007192, 73.38129496402877),
+    HSV(112.76740237691003, 73.16638370118852, 109.96604414261459)
+)
+cubeHSV = Threshhold(
+    HSV(17.805755395683452, 80.26079136690647, 20.638489208633093),
+    HSV(68.45500848896434, 255.0, 125.11884550084889)
+)
+
+swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
 
 contours = None
 filteredContours = None
@@ -25,12 +45,13 @@ maxRatio = 0.7
 
 red = (0, 0, 255)
 
+x = None
+y = None
+
+NetworkTables.setServerTeam(2539)
+targets = NetworkTables.getTable("cameraInfo")
+
 def main():
-
-    NetworkTables.setTeam(2539)
-    NetworkTables.setClientMode()
-    targetInfo = NetworkTables.getTable("cameraTarget")
-
     fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
     cameraMatrix = fs.getNode('Camera_Matrix').mat()
     distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
@@ -67,59 +88,46 @@ def main():
             print("Front camera error:", frontCvSink.getError())
         else:
             cv2.undistort(front, cameraMatrix, distortionCoefficients, dst=fixed)
-            frontCvSource.putFrame(filter_process(fixed))
+            frontCvSource.putFrame(process(fixed))
 
         backTime, back = backCvSink.grabFrame(back)
         if backTime == 0:
             print("Back camera error:", backCvSink.getError())
         else:
             cv2.undistort(back, cameraMatrix, distortionCoefficients, dst=fixed)
-            backCvSource.putFrame(filter_process(fixed))
+            backCvSource.putFrame(process(fixed))
 
 
-def filter_process(src):
+def process(src):
+    findSwitch(src)
+    findCubes(src)
 
-        matches = []
-        output = []
-
-        #HSV
-        (hsvIn) = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
-        (hsvOut) = cv2.inRange(hsvIn, (hsvH[0], hsvS[0], hsvV[0]),  (hsvH[1], hsvS[1], hsvV[1]))
+    return src
 
 
-        #Find Contours
-        img, contours, hierarchy = cv2.findContours(hsvOut, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+def findContours(img, threshhold):
+    global swapColor, swapBW
 
-        #Filter Contours
-        for contour in contours:
-            x,y,w,h = cv2.boundingRect(contour)
-            if (w < minWidth):
-                continue
-            if (h < minHeight):
-                continue
-            area = cv2.contourArea(contour)
-            if (area < minArea):
-                continue
-            hull = cv2.convexHull(contour)
-            solidity = 100 * area / cv2.contourArea(hull)
-            if (solidity < minSolidity):
-                continue
-            ratio = (float)(w) / h
-            if (ratio < minRatio or ratio > maxRatio):
-                continue
-            output.append(contour)
+    cv2.cvtColor(img, cv2.COLOR_BGR2HSV, dst=swapColor)
+    cv2.inRange(swapColor, threshhold.min, threshhold.max, dst=swapBW)
 
-        for box1 in output:
-            x1,y1,w1,h1 = cv2.boundingRect(box1)
-            for box2 in output:
-                x2,y2,w2,h2 = cv2.boundingRect(box2)
-                if abs(y1 - y2) > (.25 * h1):
-                    continue
-                if abs(h1 - h2) > (.25 * h1):
-                    continue
-                cv2.rectangle(src, (x1, y1), (x2 + w2, y2 + h2), red, 2)
+    swapBW, contours, hierarchy = cv2.findContours(
+        swapBW,
+        cv2.RETR_LIST,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
 
-        return src
+    return contours
+
+
+def findSwitch(img):
+    contours = findContours(img, tapeHSV)
+    cv2.drawContours(img, contours, -1, color['gray'])
+
+
+def findCubes(img):
+    contours = findContours(img, cubeHSV)
+    cv2.drawContours(img, contours, -1, color['yellow'])
 
 
 if __name__  == '__main__':
