@@ -57,45 +57,28 @@ def main():
     distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
     fs.release()
 
-    frontCamera = cs.UsbCamera("usbcam", "/dev/video-front")
-    backCamera = cs.UsbCamera("usbcam", "/dev/video-back")
+    camera = cs.UsbCamera("usbcam", 0)
 
-    frontCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    backCamera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
 
-    frontCvSink = cs.CvSink("cvsink")
-    frontCvSink.setSource(frontCamera)
+    cvSink = cs.CvSink("cvsink")
+    cvSink.setSource(camera)
 
-    frontCvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    frontServer = cs.MjpegServer("cvhttpserver", 8081)
-    frontServer.setSource(frontCvSource)
+    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    server = cs.MjpegServer("cvhttpserver", 8081)
+    server.setSource(cvSource)
 
-    backCvSink = cs.CvSink("cvsink")
-    backCvSink.setSource(backCamera)
-
-    backCvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    backServer = cs.MjpegServer("cvhttpserver", 8082)
-    backServer.setSource(backCvSource)
-
-    front = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-    back = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+    img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 
     while True:
 
-        frontTime, front = frontCvSink.grabFrame(front)
-        if frontTime == 0:
-            print("Front camera error:", frontCvSink.getError())
+        time, img  = cvSink.grabFrame(img)
+        if time == 0:
+            print("Camera error:", cvSink.getError())
         else:
-            cv2.undistort(front, cameraMatrix, distortionCoefficients, dst=fixed)
-            frontCvSource.putFrame(process(fixed))
-
-        backTime, back = backCvSink.grabFrame(back)
-        if backTime == 0:
-            print("Back camera error:", backCvSink.getError())
-        else:
-            cv2.undistort(back, cameraMatrix, distortionCoefficients, dst=fixed)
-            backCvSource.putFrame(process(fixed))
+            cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
+            cvSource.putFrame(process(fixed))
 
 
 def process(src):
