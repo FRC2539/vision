@@ -22,8 +22,8 @@ color = {
 }
 
 tapeHSV = Threshhold(
-    HSV(100.35971223021582, 18.345323741007192, 73.38129496402877),
-    HSV(112.76740237691003, 73.16638370118852, 109.96604414261459)
+    HSV(20, 0, 0),
+    HSV(135, 100, 135)
 )
 cubeHSV = Threshhold(
     HSV(17.805755395683452, 80.26079136690647, 20.638489208633093),
@@ -83,7 +83,7 @@ def main():
 
 def process(src):
     findSwitch(src)
-    findCubes(src)
+    #findCubes(src)
 
     return src
 
@@ -105,7 +105,89 @@ def findContours(img, threshhold):
 
 def findSwitch(img):
     contours = findContours(img, tapeHSV)
-    cv2.drawContours(img, contours, -1, color['gray'])
+    cv2.drawContours(img, contours, -1, color['green'])
+    relevant = []
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 35:
+            continue
+
+        box = cv2.minAreaRect(contour)
+
+        ## Checks if width is less than height.
+
+        if box[1][0] < box[1][1]:
+
+            ## Ignore if too rotated
+            if box[2] < -10:
+                continue
+
+            ## Ignore if too skinny
+            if box[1][0] < 5.0:
+                continue
+
+            ratio = box[1][0] / box[1][1]
+
+        else:
+
+            ## Ignore if too rotated
+            if box[2] > -80:
+                continue
+
+            ## Ignore if too skinny
+            if box[1][1] < 5.0:
+                continue
+
+            ratio = box[1][1] / box[1][0]
+
+        ## Ignore if wrong shape (2" x 5")
+        if ratio < .3 or ratio > .5:
+            continue
+        ## Ignore if too concave
+
+        hull = cv2.convexHull(contour)
+        solidity = 100 * area / cv2.contourArea(hull)
+        if solidity < 50.0:
+            continue
+
+
+
+        relevant.append(cv2.boundingRect(contour))
+
+     ## We need at least 2 boxes to make a target
+
+    if  len(relevant) < 2:
+        targets.putBoolean("switchVisible", False)
+        return
+
+    relevant.sort(key=lambda x: x[0])
+    switches = []
+    while len(relevant) > 1:
+
+        box1 = relevant.pop(0)
+
+        for box2 in relevant:
+
+            ## Are the boxes next to each other?
+            if abs(box1[1] - box2[1]) > .25 * box1[3]:
+                continue
+
+            ## Are the boxes the same size?
+            if abs(box1[3] - box2[3]) > .25 * box1[3]:
+                continue
+
+            width = box2[0] +  box2[2] - box1[0]
+            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
+            yPoints.sort()
+            height = yPoints[3] - yPoints[0]
+            ratio = width / height
+            if ratio > 3 or ratio < 1:
+                continue
+            switches.append((box1[0], yPoints[0], width, height))
+
+    for target in switches:
+        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 2)
+
 
 
 def findCubes(img):
