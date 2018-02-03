@@ -95,7 +95,7 @@ def findContours(img, threshhold):
 
 def findSwitch(img):
     contours = findContours(img, tapeHSV)
-    cv2.drawContours(img, contours, -1, color['gray'])
+    #cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
 
     for contour in contours:
@@ -190,7 +190,7 @@ def findCubes(img):
     relevant = []
     target = None
 
-    cv2.drawContours(img, contours, -1, color['yellow'])
+    #cv2.drawContours(img, contours, -1, color['yellow'])
 
     for contour in contours:
         area = cv2.contourArea(contour)
