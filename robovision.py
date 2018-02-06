@@ -22,8 +22,8 @@ color = {
 }
 
 tapeHSV = Threshhold(
-    HSV(20, 0, 0),
-    HSV(135, 100, 135)
+    HSV(0, 0, 230),
+    HSV(179, 25, 255)
 )
 cubeHSV = Threshhold(
     HSV(17.805755395683452, 80.26079136690647, 20.638489208633093),
@@ -107,9 +107,10 @@ def findSwitch(img):
     contours = findContours(img, tapeHSV)
     cv2.drawContours(img, contours, -1, color['green'])
     relevant = []
+
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 35:
+        if area < 200:
             continue
 
         box = cv2.minAreaRect(contour)
@@ -117,11 +118,11 @@ def findSwitch(img):
         ## Checks if width is less than height.
 
         if box[1][0] < box[1][1]:
-
+            '''
             ## Ignore if too rotated
             if box[2] < -10:
                 continue
-
+            '''
             ## Ignore if too skinny
             if box[1][0] < 5.0:
                 continue
@@ -129,25 +130,25 @@ def findSwitch(img):
             ratio = box[1][0] / box[1][1]
 
         else:
-
+            '''
             ## Ignore if too rotated
             if box[2] > -80:
                 continue
-
+            '''
             ## Ignore if too skinny
             if box[1][1] < 5.0:
                 continue
 
             ratio = box[1][1] / box[1][0]
 
-        ## Ignore if wrong shape (2" x 5")
-        if ratio < .3 or ratio > .5:
-            continue
+        ## Ignore if wrong shape (2" x 15")
+        '''if ratio < .1 or ratio > .2:
+            continue'''
         ## Ignore if too concave
 
         hull = cv2.convexHull(contour)
         solidity = 100 * area / cv2.contourArea(hull)
-        if solidity < 50.0:
+        if solidity < 80.0:
             continue
 
 
@@ -180,13 +181,13 @@ def findSwitch(img):
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
             height = yPoints[3] - yPoints[0]
-            ratio = width / height
-            if ratio > 3 or ratio < 1:
-                continue
+            '''ratio = width / height
+            if ratio > .1 or ratio < .2:
+                continue'''
             switches.append((box1[0], yPoints[0], width, height))
 
     for target in switches:
-        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 2)
+        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
 
 
 
