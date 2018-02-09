@@ -26,8 +26,8 @@ tapeHSV = Threshhold(
     HSV(179, 25, 255)
 )
 cubeHSV = Threshhold(
-    HSV(17.805755395683452, 80.26079136690647, 20.638489208633093),
-    HSV(68.45500848896434, 255.0, 125.11884550084889)
+    HSV(30, 70, 50),
+    HSV(60, 255.0, 250)
 )
 
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
@@ -83,7 +83,7 @@ def main():
 
 def process(src):
     findSwitch(src)
-    #findCubes(src)
+    findCubes(src)
 
     return src
 
@@ -193,7 +193,23 @@ def findSwitch(img):
 
 def findCubes(img):
     contours = findContours(img, cubeHSV)
+    relevant = []
+
     cv2.drawContours(img, contours, -1, color['yellow'])
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 1000:
+            continue
+
+        solidity = 100 * area / cv2.contourArea(cv2.convexHull(contour))
+        if solidity < 90.0:
+            continue
+
+        relevant.append(cv2.boundingRect(contour))
+
+    for target in relevant:
+        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['blue'], 3)
 
 
 if __name__  == '__main__':
