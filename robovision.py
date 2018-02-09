@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from networktables import NetworkTables
 from collections import namedtuple
+import math
 
 HSV = namedtuple('HSV', ('H', 'S', 'V'))
 Threshhold = namedtuple('Threshhold', ('min', 'max'))
@@ -174,10 +175,14 @@ def findSwitch(img):
                 continue
 
             switches.append((box1[0], yPoints[0], width, height))
-            print(width)
+
     targets.putBoolean('switchVisible', len(switches) > 0)
+
     for target in switches:
         cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
+        distance = 5543.635 * math.pow(target[2], -0.9634221)
+        targets.putValue('switchDistance', distance)
+        print(distance)
 
 
 def findCubes(img):
