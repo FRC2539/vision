@@ -15,6 +15,7 @@ color = {
     'red': Color(0, 0, 255),
     'green': Color(0, 255, 0),
     'blue': Color(255, 0, 0),
+    'purple': Color(255, 0, 255),
     'yellow': Color(0, 255, 255),
     'black': Color(0, 0, 0),
     'white': Color(255, 255, 255),
@@ -26,7 +27,7 @@ tapeHSV = Threshhold(
     HSV(179, 25, 255)
 )
 cubeHSV = Threshhold(
-    HSV(30, 70, 50),
+    HSV(30, 50, 50),
     HSV(60, 255.0, 250)
 )
 
@@ -93,7 +94,7 @@ def findContours(img, threshhold):
 
 def findSwitch(img):
     contours = findContours(img, tapeHSV)
-    cv2.drawContours(img, contours, -1, color['green'])
+    cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
 
     for contour in contours:
@@ -128,7 +129,7 @@ def findSwitch(img):
             ratio = box[1][1] / box[1][0]
 
         # Ignore if wrong shape (2" x 15.3")
-        if ratio < .1 or ratio > .2:
+        if ratio < 0.08 or ratio > 0.2:
             continue
 
         # Ignore if too concave
@@ -169,7 +170,7 @@ def findSwitch(img):
             ratio = width / height
 
             # Ignore if wrong shape (8" x 15.3")
-            if ratio < .4 or ratio > .6:
+            if ratio < 0.3 or ratio > 0.6:
                 continue
 
             switches.append((box1[0], yPoints[0], width, height))
@@ -182,6 +183,7 @@ def findSwitch(img):
 def findCubes(img):
     contours = findContours(img, cubeHSV)
     relevant = []
+    target = None
 
     cv2.drawContours(img, contours, -1, color['yellow'])
 
@@ -191,13 +193,26 @@ def findCubes(img):
             continue
 
         solidity = 100 * area / cv2.contourArea(cv2.convexHull(contour))
-        if solidity < 90.0:
+        if solidity < 70.0:
             continue
 
         relevant.append(cv2.boundingRect(contour))
 
-    for target in relevant:
-        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['blue'], 3)
+    if len(relevant) > 0:
+        target = relevant[0]
+        targetArea = target[2] * target[3]
+        ratio = None
+
+        for box in relevant:
+            if box[2] * box[3] > targetArea:
+                target = box
+
+        ratio = (target[2] / target[3])
+
+        if ratio > 1.1 and ratio < 1.7:
+            cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['blue'], 3)
+        else:
+            cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['purple'], 3)
 
 
 if __name__  == '__main__':
