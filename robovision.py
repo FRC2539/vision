@@ -32,21 +32,7 @@ cubeHSV = Threshhold(
 
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
-
-contours = None
-filteredContours = None
-
-minArea = 50.0
-minWidth = 5.0
-minHeight = 5.0
-minSolidity = 80.0
-minRatio = 0.3
-maxRatio = 0.7
-
-red = (0, 0, 255)
-
-x = None
-y = None
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
 NetworkTables.setServerTeam(2539)
 targets = NetworkTables.getTable("cameraInfo")
@@ -89,10 +75,12 @@ def process(src):
 
 
 def findContours(img, threshhold):
-    global swapColor, swapBW
+    global swapColor, swapBW, kernel
 
     cv2.cvtColor(img, cv2.COLOR_BGR2HSV, dst=swapColor)
     cv2.inRange(swapColor, threshhold.min, threshhold.max, dst=swapBW)
+    cv2.erode(swapBW, kernel, dst=swapBW)
+    cv2.dilate(swapBW, kernel, dst=swapBW)
 
     swapBW, contours, hierarchy = cv2.findContours(
         swapBW,
@@ -115,48 +103,45 @@ def findSwitch(img):
 
         box = cv2.minAreaRect(contour)
 
-        ## Checks if width is less than height.
+        # Checks if width is less than height.
 
         if box[1][0] < box[1][1]:
-            '''
-            ## Ignore if too rotated
+            # Ignore if too rotated
             if box[2] < -10:
                 continue
-            '''
-            ## Ignore if too skinny
+
+            # Ignore if too skinny
             if box[1][0] < 5.0:
                 continue
 
             ratio = box[1][0] / box[1][1]
 
         else:
-            '''
-            ## Ignore if too rotated
+            # Ignore if too rotated
             if box[2] > -80:
                 continue
-            '''
-            ## Ignore if too skinny
+
+            # Ignore if too skinny
             if box[1][1] < 5.0:
                 continue
 
             ratio = box[1][1] / box[1][0]
 
-        ## Ignore if wrong shape (2" x 15")
-        '''if ratio < .1 or ratio > .2:
-            continue'''
-        ## Ignore if too concave
+        # Ignore if wrong shape (2" x 15.3")
+        if ratio < .1 or ratio > .2:
+            continue
 
+        # Ignore if too concave
         hull = cv2.convexHull(contour)
-        solidity = 100 * area / cv2.contourArea(hull)
-        if solidity < 80.0:
+        solidity = area / cv2.contourArea(hull)
+        if solidity < 0.8:
             continue
 
 
 
         relevant.append(cv2.boundingRect(contour))
 
-     ## We need at least 2 boxes to make a target
-
+    # We need at least 2 boxes to make a target
     if  len(relevant) < 2:
         targets.putBoolean("switchVisible", False)
         return
@@ -169,11 +154,11 @@ def findSwitch(img):
 
         for box2 in relevant:
 
-            ## Are the boxes next to each other?
+            # Are the boxes next to each other?
             if abs(box1[1] - box2[1]) > .25 * box1[3]:
                 continue
 
-            ## Are the boxes the same size?
+            # Are the boxes the same size?
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
@@ -181,14 +166,17 @@ def findSwitch(img):
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
             height = yPoints[3] - yPoints[0]
-            '''ratio = width / height
-            if ratio > .1 or ratio < .2:
-                continue'''
+            ratio = width / height
+
+            # Ignore if wrong shape (8" x 15.3")
+            if ratio < .4 or ratio > .6:
+                continue
+
             switches.append((box1[0], yPoints[0], width, height))
 
+    targets.putBoolean('switchVisible', len(switches) > 0)
     for target in switches:
         cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
-
 
 
 def findCubes(img):
