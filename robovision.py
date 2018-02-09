@@ -174,7 +174,7 @@ def findSwitch(img):
                 continue
 
             switches.append((box1[0], yPoints[0], width, height))
-
+            print(width)
     targets.putBoolean('switchVisible', len(switches) > 0)
     for target in switches:
         cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
