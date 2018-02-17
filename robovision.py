@@ -7,6 +7,7 @@ import numpy as np
 from networktables import NetworkTables
 from collections import namedtuple
 import math
+from multiprocessing import Process, Queue
 
 HSV = namedtuple('HSV', ('H', 'S', 'V'))
 Threshhold = namedtuple('Threshhold', ('min', 'max'))
@@ -59,6 +60,9 @@ def main():
     img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 
+    q = Queue()
+    p = None
+
     while True:
 
         time, img  = cvSink.grabFrame(img)
@@ -66,7 +70,19 @@ def main():
             print("Camera error:", cvSink.getError())
         else:
             cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
-            cvSource.putFrame(process(fixed))
+
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource.putFrame(fixed)
+
+            if not q.empty():
+                targets = q.get()
+
+            if p is None or not p.is_alive():
+                p = Process(
+                    target=findSwitch,
+                    args=(findContours(fixed, tapeHSV), q)
+                )
+                p.start()
 
 
 def process(src):
@@ -93,8 +109,8 @@ def findContours(img, threshhold):
     return contours
 
 
-def findSwitch(img):
-    contours = findContours(img, tapeHSV)
+def findSwitch(contours, q):
+    #contours = findContours(img, tapeHSV)
     #cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
 
@@ -145,7 +161,7 @@ def findSwitch(img):
 
     # We need at least 2 boxes to make a target
     if  len(relevant) < 2:
-        targets.putBoolean("switchVisible", False)
+        q.put([False, 0])
         return
 
     relevant.sort(key=lambda x: x[0])
@@ -176,13 +192,12 @@ def findSwitch(img):
 
             switches.append((box1[0], yPoints[0], width, height))
 
-    targets.putBoolean('switchVisible', len(switches) > 0)
-
-    for target in switches:
-        cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
-        distance = 5543.635 * math.pow(target[2], -0.9634221)
-        targets.putValue('switchDistance', distance)
-        #print(distance)
+    if len(switches) > 0:
+        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['red'], 3)
+        distance = 5543.635 * math.pow(switches[0][2], -0.9634221)
+        q.put([True, distance])
+    else:
+        q.put([False, 0])
 
 
 def findCubes(img):
