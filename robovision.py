@@ -1,4 +1,4 @@
-#! /usr/bin/virtualenv python3
+#! /usr/bin/env python3
 #A vision program for FRC, written in python.
 
 import cscore as cs
@@ -53,7 +53,7 @@ def main():
     cvSink.setSource(camera)
 
     cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    server = cs.MjpegServer("cvhttpserver", 8081)
+    server = cs.MjpegServer("cvhttpserver", 5801)
     server.setSource(cvSource)
 
     img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
@@ -182,7 +182,7 @@ def findSwitch(img):
         cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['red'], 3)
         distance = 5543.635 * math.pow(target[2], -0.9634221)
         targets.putValue('switchDistance', distance)
-        print(distance)
+        #print(distance)
 
 
 def findCubes(img):
@@ -216,13 +216,14 @@ def findCubes(img):
 
         if ratio > 1.1 and ratio < 1.7:
             cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['blue'], 3)
+
         else:
             cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['purple'], 3)
 
         height = target[3]
         distance = 8654.642 * math.pow(target[3], -1.037359)
         targets.putValue('cubeDistance', distance)
-        print(distance)
+        #print(distance)
 
 
 if __name__  == '__main__':
