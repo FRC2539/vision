@@ -243,6 +243,8 @@ class Camera:
             for color, contours in drawables:
                 cv2.drawContours(img, contours, -1, color, 2)
 
+        return img
+
 
     @classmethod
     def startVision(cls):
