@@ -2,6 +2,7 @@
 # A vision program for FRC, written in python.
 
 from cameratools import Threshhold, HSV, colors, Target, Camera
+import cv2
 
 tapeHSV = Threshhold(
     HSV(0, 0, 230),

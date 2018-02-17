@@ -87,13 +87,20 @@ class Camera:
         else:
             color = colors['white']
 
-        processor = Processor(name, processor, color, Queue(), Process())
+        processor = {
+            'name': name,
+            'function': processor,
+            'color': color,
+            'queue': Queue(),
+            'process': Process()
+        }
 
         try:
             self.processors[hsv].append(processor)
-        except AttributeError:
-            self.processors[hsv] = []
-            self.processors[hsv].append(processor)
+        except KeyError:
+            self.processors[hsv] = [processor]
+            self.contourAge[hsv] = 10
+            self.markerAge[processor['name']] = 0
 
 
     def processImage(self):
@@ -107,17 +114,17 @@ class Camera:
             for hsv, processors in self.processors.items():
                 self.contourAge[hsv] += 1
                 for processor in processors:
-                    while not processor.queue.empty():
-                        self.newTargets[processor.name].append(processor.queue.get())
+                    while not processor['queue'].empty():
+                        self.newTargets[processor['name']].append(processor['queue'].get())
 
-                    if not processor.process.is_alive():
+                    if not processor['process'].is_alive():
                         self.registerTargets(processor)
-                        self.newTargets[processor.name] = []
-                        processor.process = Process(
-                            target=processor.function,
-                            args=(self.contours(img, hsv), processor.queue)
+                        self.newTargets[processor['name']] = []
+                        processor['process'] = Process(
+                            target=processor['function'],
+                            args=(self.contours(img, hsv), processor['queue'])
                         )
-                        processor.process.start()
+                        processor['process'].start()
 
 
     def debugImage(self):
@@ -180,10 +187,10 @@ class Camera:
                     img,
                     cameraMatrix,
                     distortionCoefficients,
-                    dst=fixed
+                    dst=cls.swapColor2
                 )
 
-                return fixed
+                return cls.swapColor2
 
             cls.undistort = undistort
 
@@ -191,26 +198,29 @@ class Camera:
             cls.nt = NetworkTables.getTable('vision')
             cls.debug = cls.nt.getAutoUpdateValue('debug', False)
 
-        cls.nt.putNumberArray(cls.usedPorts)
+        cls.nt.putNumberArray('ports', cls.usedPorts)
         cls.cameras.append(camera)
 
 
     def registerTargets(self, processor):
         try:
-            targets = self.newTargets[processor.name]
+            targets = self.newTargets[processor['name']]
         except KeyError:
-            Camera.nt.putBoolean('%s/found' % processor.name, False)
+            Camera.nt.putBoolean('%s/found' % processor['name'], False)
             return
 
         if len(targets) == 0:
-            self.markerAge[processor.name] += 1
-            if self.markerAge[processor.name] > 5:
-                del self.markers[processor.name]
-                Camera.nt.putBoolean('%s/found' % processor.name, False)
+            self.markerAge[processor['name']] += 1
+            if self.markerAge[processor['name']] > 5:
+                try:
+                    del self.markers[processor['name']]
+                except KeyError:
+                    pass
+                Camera.nt.putBoolean('%s/found' % processor['name'], False)
 
             return
 
-        self.markerAge[processor.name] = 0
+        self.markerAge[processor['name']] = 0
         contours = []
         distances = []
         x = []
@@ -221,11 +231,11 @@ class Camera:
             y.append(target.y)
             contours.append(target.contour)
 
-        Camera.nt.putBoolean('%s/found' % processor.name, True)
-        Camera.nt.putNumberArray('%s/distance' % processor.name, distances)
-        Camera.nt.putNumberArray('%s/x' % processor.name, x)
-        Camera.nt.putNumberArray('%s/y' % processor.name, y)
-        self.markers[processor.name] = Drawable(processor.color, contours)
+        Camera.nt.putBoolean('%s/found' % processor['name'], True)
+        Camera.nt.putNumberArray('%s/distance' % processor['name'], distances)
+        Camera.nt.putNumberArray('%s/x' % processor['name'], x)
+        Camera.nt.putNumberArray('%s/y' % processor['name'], y)
+        self.markers[processor.name] = Drawable(processor['color'], contours)
 
 
     def drawTargets(self, img):
@@ -236,12 +246,12 @@ class Camera:
 
     @classmethod
     def startVision(cls):
-        if cls.debug:
-            while cls.debug:
+        if cls.debug.value:
+            while cls.debug.value:
                 for camera in cls.cameras:
                     camera.debugImage()
 
         else:
-            while not cls.debug:
+            while not cls.debug.value:
                 for camera in cls.cameras:
                     camera.processImage()
