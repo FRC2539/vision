@@ -219,6 +219,11 @@ def findCubes(img):
         else:
             cv2.rectangle(img, (target[0], target[1]), (target[0] + target[2], target[1] + target[3]), color['purple'], 3)
 
+        height = target[3]
+        distance = 8654.642 * math.pow(target[3], -1.037359)
+        targets.putValue('cubeDistance', distance)
+        print(distance)
+
 
 if __name__  == '__main__':
     main()
