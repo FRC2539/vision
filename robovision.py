@@ -1,28 +1,7 @@
 #! /usr/bin/env python3
-#A vision program for FRC, written in python.
+# A vision program for FRC, written in python.
 
-import cscore as cs
-import cv2
-import numpy as np
-from networktables import NetworkTables
-from collections import namedtuple
-import math
-from multiprocessing import Process, Queue
-
-HSV = namedtuple('HSV', ('H', 'S', 'V'))
-Threshhold = namedtuple('Threshhold', ('min', 'max'))
-Color = namedtuple('Color', ('blue', 'green', 'red'))
-
-color = {
-    'red': Color(0, 0, 255),
-    'green': Color(0, 255, 0),
-    'blue': Color(255, 0, 0),
-    'purple': Color(255, 0, 255),
-    'yellow': Color(0, 255, 255),
-    'black': Color(0, 0, 0),
-    'white': Color(255, 255, 255),
-    'gray': Color(127, 127, 127)
-}
+from cameratools import Threshhold, HSV, colors, Target, Camera
 
 tapeHSV = Threshhold(
     HSV(0, 0, 230),
@@ -33,85 +12,14 @@ cubeHSV = Threshhold(
     HSV(60, 255.0, 250)
 )
 
-swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-
-NetworkTables.setServerTeam(2539)
-targets = NetworkTables.getTable("cameraInfo")
-
 def main():
-    fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
-    cameraMatrix = fs.getNode('Camera_Matrix').mat()
-    distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
-    fs.release()
-
-    camera = cs.UsbCamera("usbcam", 0)
-
-    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-
-    cvSink = cs.CvSink("cvsink")
-    cvSink.setSource(camera)
-
-    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    server = cs.MjpegServer("cvhttpserver", 5801)
-    server.setSource(cvSource)
-
-    img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-    fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-
-    q = Queue()
-    p = None
-
-    while True:
-
-        time, img  = cvSink.grabFrame(img)
-        if time == 0:
-            print("Camera error:", cvSink.getError())
-        else:
-            cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
-
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource.putFrame(fixed)
-
-            if not q.empty():
-                targets = q.get()
-
-            if p is None or not p.is_alive():
-                p = Process(
-                    target=findSwitch,
-                    args=(findContours(fixed, tapeHSV), q)
-                )
-                p.start()
-
-
-def process(src):
-    findSwitch(src)
-    findCubes(src)
-
-    return src
-
-
-def findContours(img, threshhold):
-    global swapColor, swapBW, kernel
-
-    cv2.cvtColor(img, cv2.COLOR_BGR2HSV, dst=swapColor)
-    cv2.inRange(swapColor, threshhold.min, threshhold.max, dst=swapBW)
-    cv2.erode(swapBW, kernel, dst=swapBW)
-    cv2.dilate(swapBW, kernel, dst=swapBW)
-
-    swapBW, contours, hierarchy = cv2.findContours(
-        swapBW,
-        cv2.RETR_LIST,
-        cv2.CHAIN_APPROX_SIMPLE
-    )
-
-    return contours
+    camera = Camera(0)
+    camera.addProcessor('switch', tapeHSV, findSwitch, color=colors['blue'])
+    #camera.addProcessor('cube', cubeHSV, findCubes, color=colors['yellow'])
+    Camera.startVision()
 
 
 def findSwitch(contours, q):
-    #contours = findContours(img, tapeHSV)
-    #cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
 
     for contour in contours:
@@ -155,13 +63,10 @@ def findSwitch(contours, q):
         if solidity < 0.8:
             continue
 
-
-
         relevant.append(cv2.boundingRect(contour))
 
     # We need at least 2 boxes to make a target
     if  len(relevant) < 2:
-        q.put([False, 0])
         return
 
     relevant.sort(key=lambda x: x[0])
@@ -180,7 +85,7 @@ def findSwitch(contours, q):
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
-            width = box2[0] +  box2[2] - box1[0]
+            width = box2[0] + box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
             height = yPoints[3] - yPoints[0]
@@ -190,22 +95,27 @@ def findSwitch(contours, q):
             if ratio < 0.3 or ratio > 0.6:
                 continue
 
-            switches.append((box1[0], yPoints[0], width, height))
+            outline = [
+                (box1[0], box1[1]),
+                (box1[0], box1[1] + box1[3]),
+                (box2[0] + box2[2], box2[1] + box2[3]),
+                (box2[0] + box2[2], box2[1])
+            ]
+            switches.append((box1[0], yPoints[0], width, height, outline))
 
     if len(switches) > 0:
-        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['red'], 3)
         distance = 5543.635 * math.pow(switches[0][2], -0.9634221)
-        q.put([True, distance])
-    else:
-        q.put([False, 0])
+        q.put(Target(
+            distance,
+            switches[0][0] + width/2,
+            switches[0][1] + height/2,
+            switches[0][4]
+        ))
 
 
-def findCubes(img):
-    contours = findContours(img, cubeHSV)
+def findCubes(contours, q):
     relevant = []
     target = None
-
-    #cv2.drawContours(img, contours, -1, color['yellow'])
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -238,7 +148,6 @@ def findCubes(img):
         height = target[3]
         distance = 8654.642 * math.pow(target[3], -1.037359)
         targets.putValue('cubeDistance', distance)
-        #print(distance)
 
 
 if __name__  == '__main__':
