@@ -22,7 +22,7 @@ color = {
     'black': Color(0, 0, 0),
     'white': Color(255, 255, 255),
     'gray': Color(127, 127, 127),
-    'neon_blue': Color(83, 243, 252)
+    'neon': Color(244, 134, 66)
 }
 
 tapeHSV = Threshold(
@@ -34,7 +34,7 @@ cubeHSV = Threshold(
     HSV(60, 255.0, 250)
 )
 cargoHSV = Threshold(
-    HSV(0, 76, 0),
+    HSV(0, 77, 0),
     HSV(180, 237, 229)
 )
 
@@ -283,7 +283,7 @@ def findCargo(img):
             center_x = int(center[0])
             center_y = int(center[1])
             radius = int(circle[1])
-            cv2.circle(img, (center_x, center_y), radius, color['neon_blue'], 3)
+            cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
 
 
 
