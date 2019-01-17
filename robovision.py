@@ -10,7 +10,7 @@ import math
 from multiprocessing import Process, Queue
 
 HSV = namedtuple('HSV', ('H', 'S', 'V'))
-Threshhold = namedtuple('Threshhold', ('min', 'max'))
+Threshold = namedtuple('Threshold', ('min', 'max'))
 Color = namedtuple('Color', ('blue', 'green', 'red'))
 
 color = {
@@ -21,16 +21,21 @@ color = {
     'yellow': Color(0, 255, 255),
     'black': Color(0, 0, 0),
     'white': Color(255, 255, 255),
-    'gray': Color(127, 127, 127)
+    'gray': Color(127, 127, 127),
+    'neon_blue': Color(83, 243, 252)
 }
 
-tapeHSV = Threshhold(
+tapeHSV = Threshold(
     HSV(0, 0, 230),
     HSV(179, 25, 255)
 )
-cubeHSV = Threshhold(
+cubeHSV = Threshold(
     HSV(30, 50, 50),
     HSV(60, 255.0, 250)
+)
+cargoHSV = Threshold(
+    HSV(0, 76, 0),
+    HSV(180, 237, 229)
 )
 
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
@@ -71,23 +76,34 @@ def main():
         else:
             cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
 
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource.putFrame(fixed)
+            #cv2.putText(img,"Howdy", (0,0), cv2.Font_Hershey_Simplex, 2,255)
 
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource.putFrame(process(fixed))
+
+            p = Process(
+                target=findCubes,
+                args=(findContours(fixed, cubeHSV), q)
+            )
+            p.start()
+            print('Process started')
             if not q.empty():
                 targets = q.get()
 
+            print(p)
+
             if p is None or not p.is_alive():
                 p = Process(
-                    target=findSwitch,
-                    args=(findContours(fixed, tapeHSV), q)
+                    target=findCubes,
+                    args=(findContours(fixed, cubeHSV), q)
                 )
                 p.start()
 
 
 def process(src):
-    findSwitch(src)
+    #findSwitch(src)
     findCubes(src)
+    findCargo(src)
 
     return src
 
@@ -109,10 +125,11 @@ def findContours(img, threshhold):
     return contours
 
 
-def findSwitch(contours, q):
+def findSwitch(contours):
     #contours = findContours(img, tapeHSV)
     #cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
+
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -160,10 +177,11 @@ def findSwitch(contours, q):
         relevant.append(cv2.boundingRect(contour))
 
     # We need at least 2 boxes to make a target
+    """
     if  len(relevant) < 2:
         q.put([False, 0])
         return
-
+    """
     relevant.sort(key=lambda x: x[0])
     switches = []
     while len(relevant) > 1:
@@ -239,6 +257,36 @@ def findCubes(img):
         distance = 8654.642 * math.pow(target[3], -1.037359)
         targets.putValue('cubeDistance', distance)
         #print(distance)
+
+def findCargo(img):
+    relevantXCenters = []
+    relevantYCenters = []
+    relevantRadius = []
+    contours = findContours(img, cargoHSV)
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 1000:
+            continue
+
+        solidity = area / cv2.contourArea(cv2.convexHull(contour))
+        if solidity < 0.7:
+            continue
+
+        center, radius = cv2.minEnclosingCircle(contour)
+
+        relevantXCenters.append([center, radius])
+        #relevantRadius.append(radius)
+
+    if len(relevantXCenters) > 0:
+        for circle in relevantXCenters:
+            center = circle[0]
+            center_x = int(center[0])
+            center_y = int(center[1])
+            radius = int(circle[1])
+            cv2.circle(img, (center_x, center_y), radius, color['neon_blue'], 3)
+
+
+
 
 
 if __name__  == '__main__':
