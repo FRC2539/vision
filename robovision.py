@@ -34,8 +34,8 @@ cubeHSV = Threshold(
     HSV(60, 255.0, 250)
 )
 cargoHSV = Threshold(
-    HSV(0, 77, 0),
-    HSV(180, 237, 229)
+    HSV(0, 115, 105),
+    HSV(23, 255, 255)
 )
 
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
@@ -269,7 +269,7 @@ def findCargo(img):
             continue
 
         solidity = area / cv2.contourArea(cv2.convexHull(contour))
-        if solidity < 0.7:
+        if solidity < 0.6:
             continue
 
         center, radius = cv2.minEnclosingCircle(contour)
@@ -283,8 +283,13 @@ def findCargo(img):
             center_x = int(center[0])
             center_y = int(center[1])
             radius = int(circle[1])
+            if radius < 80:
+                continue
+            print(str(radius))
+            diameter = radius * 2
+            string = 'Center: ' + str(center_x) + ', ' + str(center_y) + ':' + ' Diameter: ' + str(diameter)
             cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
-
+            cv2.putText(img, string, (center_x, center_y), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
 
 
 
