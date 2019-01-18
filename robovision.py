@@ -26,9 +26,10 @@ color = {
 }
 
 tapeHSV = Threshold(
-    HSV(0, 0, 230),
-    HSV(179, 25, 255)
+    HSV(0, 0, 243),
+    HSV(102, 21, 255)
 )
+
 cubeHSV = Threshold(
     HSV(30, 50, 50),
     HSV(60, 255.0, 250)
@@ -101,7 +102,7 @@ def main():
 
 
 def process(src):
-    #findSwitch(src)
+    findTape(src)
     findCubes(src)
     findCargo(src)
 
@@ -125,21 +126,28 @@ def findContours(img, threshhold):
     return contours
 
 
-def findSwitch(contours):
-    #contours = findContours(img, tapeHSV)
-    #cv2.drawContours(img, contours, -1, color['gray'])
-    relevant = []
+def findTape(img):
 
+    contours = findContours(img, tapeHSV)
+    cv2.drawContours(img, contours, -1, color['gray'])
+    relevant = []
 
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 200:
+        area_string = 'Area: ' + str(area)
+        cv2.putText(img, area_string, (300, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+        if area < 10:
+            cv2.putText(img, 'Area Check', (200, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
             continue
 
         box = cv2.minAreaRect(contour)
-
+        cv2.putText(img, 'Min', (300, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
         # Checks if width is less than height.
+        print(box)
 
+        relevant.append(cv2.boundingRect(contour))
+
+    """
         if box[1][0] < box[1][1]:
             # Ignore if too rotated
             if box[2] < -10:
@@ -173,17 +181,17 @@ def findSwitch(contours):
             continue
 
 
-
-        relevant.append(cv2.boundingRect(contour))
-
     # We need at least 2 boxes to make a target
-    """
+
     if  len(relevant) < 2:
         q.put([False, 0])
         return
+
     """
     relevant.sort(key=lambda x: x[0])
     switches = []
+
+
     while len(relevant) > 1:
 
         box1 = relevant.pop(0)
@@ -210,13 +218,19 @@ def findSwitch(contours):
 
             switches.append((box1[0], yPoints[0], width, height))
 
+
+    print('I am an even bigger idiot')
     if len(switches) > 0:
+        print('I am an idiot')
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['red'], 3)
+
+    """
         distance = 5543.635 * math.pow(switches[0][2], -0.9634221)
+
         q.put([True, distance])
     else:
         q.put([False, 0])
-
+    """
 
 def findCubes(img):
     contours = findContours(img, cubeHSV)
@@ -256,7 +270,7 @@ def findCubes(img):
         height = target[3]
         distance = 8654.642 * math.pow(target[3], -1.037359)
         targets.putValue('cubeDistance', distance)
-        #print(distance)
+        print(distance)
 
 def findCargo(img):
     relevantXCenters = []
@@ -290,7 +304,8 @@ def findCargo(img):
             string = 'Center: ' + str(center_x) + ', ' + str(center_y) + ':' + ' Diameter: ' + str(diameter)
             cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
             cv2.putText(img, string, (center_x, center_y), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
-
+            targets.putValue('cargoX', center_x)
+            targets.putValue('CargoY', center_y)
 
 
 
