@@ -26,7 +26,7 @@ color = {
 }
 
 tapeHSV = Threshold(
-    HSV(0, 0, 243),
+    HSV(0, 0, 235),
     HSV(102, 21, 255)
 )
 
@@ -103,7 +103,7 @@ def main():
 
 def process(src):
     findTape(src)
-    findCubes(src)
+    #findCubes(src)
     findCargo(src)
 
     return src
@@ -131,19 +131,15 @@ def findTape(img):
     contours = findContours(img, tapeHSV)
     cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
+    temp_height = 350
 
     for contour in contours:
         area = cv2.contourArea(contour)
-        area_string = 'Area: ' + str(area)
-        cv2.putText(img, area_string, (300, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
-        if area < 10:
-            cv2.putText(img, 'Area Check', (200, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+        if area < 25:
             continue
 
         box = cv2.minAreaRect(contour)
-        cv2.putText(img, 'Min', (300, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
         # Checks if width is less than height.
-        print(box)
 
         relevant.append(cv2.boundingRect(contour))
 
@@ -189,16 +185,20 @@ def findTape(img):
 
     """
     relevant.sort(key=lambda x: x[0])
+    cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
     switches = []
 
 
     while len(relevant) > 1:
 
         box1 = relevant.pop(0)
-
+        i_hate_this_code = 200
         for box2 in relevant:
 
             # Are the boxes next to each other?
+            stringy = 'box[0]: ' + str(box1[0]) + '\nbox[1]: ' + str(box1[1]) + '\nbox[2]: ' + str(box1[2]) + '\nbox[3]: ' + str(box1[3])
+            cv2.putText(img, str(stringy), (100, i_hate_this_code), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+            i_hate_this_code += 50
             if abs(box1[1] - box2[1]) > .25 * box1[3]:
                 continue
 
@@ -213,16 +213,15 @@ def findTape(img):
             ratio = width / height
 
             # Ignore if wrong shape (8" x 15.3")
-            if ratio < 0.3 or ratio > 0.6:
-                continue
+            #if ratio < 0.3 or ratio > 0.6:
+             #   continue
 
             switches.append((box1[0], yPoints[0], width, height))
 
 
-    print('I am an even bigger idiot')
+    cv2.putText(img, str(len(switches)), (300, temp_height), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
     if len(switches) > 0:
-        print('I am an idiot')
-        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['red'], 3)
+        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
     """
         distance = 5543.635 * math.pow(switches[0][2], -0.9634221)
@@ -279,9 +278,10 @@ def findCargo(img):
     contours = findContours(img, cargoHSV)
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 1000:
+        if area < 10000:
             continue
 
+        cv2.putText(img, 'area: ' + str(area), (350, 400), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
         solidity = area / cv2.contourArea(cv2.convexHull(contour))
         if solidity < 0.6:
             continue
@@ -297,17 +297,22 @@ def findCargo(img):
             center_x = int(center[0])
             center_y = int(center[1])
             radius = int(circle[1])
+            diameter = radius * 2
+
             if radius < 80:
                 continue
-            print(str(radius))
-            diameter = radius * 2
+
             string = 'Center: ' + str(center_x) + ', ' + str(center_y) + ':' + ' Diameter: ' + str(diameter)
+
             cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
             cv2.putText(img, string, (center_x, center_y), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+
             targets.putValue('cargoX', center_x)
             targets.putValue('CargoY', center_y)
 
-
+            distance = (-0.05990983 * int(diameter)) + 59.83871
+            cv2.putText(img, 'distance: ' +  str(distance), (360, 360), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+            targets.putValue('distanceToCargo', distance)
 
 if __name__  == '__main__':
     main()
