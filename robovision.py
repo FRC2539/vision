@@ -9,6 +9,10 @@ from collections import namedtuple
 import math
 from multiprocessing import Process, Queue
 
+NetworkTables.initialize(server='roborio-2539-frc.local')
+
+cameraTable = NetworkTables.getTable('cameraInfo')
+
 HSV = namedtuple('HSV', ('H', 'S', 'V'))
 Threshold = namedtuple('Threshold', ('min', 'max'))
 Color = namedtuple('Color', ('blue', 'green', 'red'))
@@ -42,9 +46,6 @@ cargoHSV = Threshold(
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-
-NetworkTables.setServerTeam(2539)
-targets = NetworkTables.getTable("cameraInfo")
 
 def main():
     fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
@@ -268,7 +269,7 @@ def findCubes(img):
 
         height = target[3]
         distance = 8654.642 * math.pow(target[3], -1.037359)
-        targets.putValue('cubeDistance', distance)
+        cameraTable.putNumber('cubeDistance', int(distance))
         print(distance)
 
 def findCargo(img):
@@ -291,6 +292,8 @@ def findCargo(img):
         relevantXCenters.append([center, radius])
         #relevantRadius.append(radius)
 
+    cameraTable.putBoolean('cargoFound', False)
+
     if len(relevantXCenters) > 0:
         for circle in relevantXCenters:
             center = circle[0]
@@ -303,16 +306,18 @@ def findCargo(img):
                 continue
 
             string = 'Center: ' + str(center_x) + ', ' + str(center_y) + ':' + ' Diameter: ' + str(diameter)
-
-            cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
             cv2.putText(img, string, (center_x, center_y), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
 
-            targets.putValue('cargoX', center_x)
-            targets.putValue('CargoY', center_y)
+            cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
+
+            cameraTable.putBoolean('cargoFound', True)
+
+            cameraTable.putNumber('cargoX', center_x)
+            cameraTable.putNumber('cargoY', center_y)
 
             distance = (-0.05990983 * int(diameter)) + 59.83871
             cv2.putText(img, 'distance: ' +  str(distance), (360, 360), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
-            targets.putValue('distanceToCargo', distance)
+            cameraTable.putNumber('distanceToCargo', distance)
 
 if __name__  == '__main__':
     main()
