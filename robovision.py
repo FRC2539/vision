@@ -31,7 +31,7 @@ color = {
 
 tapeHSV = Threshold(
     HSV(0, 0, 235),
-    HSV(102, 21, 255)
+    HSV(102, 25, 255)
 )
 
 cubeHSV = Threshold(
@@ -133,6 +133,7 @@ def findTape(img):
     cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
     temp_height = 350
+    cameraTable.putBoolean('tapeFound', False)
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -141,8 +142,15 @@ def findTape(img):
 
         box = cv2.minAreaRect(contour)
         # Checks if width is less than height.
-
         relevant.append(cv2.boundingRect(contour))
+
+    """
+    In theory:
+    Box1[0] = x
+    Box1[1] = y
+    Box1[2] = width
+    Box1[3] = height
+    """
 
     """
         if box[1][0] < box[1][1]:
@@ -185,27 +193,52 @@ def findTape(img):
         return
 
     """
+
     relevant.sort(key=lambda x: x[0])
     cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
     switches = []
 
 
     while len(relevant) > 1:
+        cameraTable.putBoolean('tapeFound', False)
+        cameraTable.putNumber('distanceToTape', -1)
+        cameraTable.putNumber('tapeX', -1)
 
         box1 = relevant.pop(0)
         i_hate_this_code = 200
         for box2 in relevant:
 
             # Are the boxes next to each other?
-            stringy = 'box[0]: ' + str(box1[0]) + '\nbox[1]: ' + str(box1[1]) + '\nbox[2]: ' + str(box1[2]) + '\nbox[3]: ' + str(box1[3])
-            cv2.putText(img, str(stringy), (100, i_hate_this_code), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
-            i_hate_this_code += 50
             if abs(box1[1] - box2[1]) > .25 * box1[3]:
                 continue
 
             # Are the boxes the same size?
-            if abs(box1[3] - box2[3]) > .25 * box1[3]:
+            if abs(box1[3] - box2[3]) > .35 * box1[3]:
                 continue
+
+            if box1[0] > box2[0]:
+                greaterXVal = box1[0]
+                smallerXVal = box2[0]
+            else:
+                greaterXVal = box2[0]
+                smallerXVal = box1[0]
+
+            displacement = greaterXVal - smallerXVal
+            centerDisplacement = displacement / 2
+            finalCenter = smallerXVal + centerDisplacement
+
+            distanceBetweenObject = abs(box1[0] - box2[0])
+
+            distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
+
+            hasTape = True
+            cameraTable.putBoolean('tapeFound', hasTape)
+
+            if hasTape:
+                cameraTable.putNumber('tapeX', finalCenter)
+                cameraTable.putNumber('distanceToTape', int(distance))
+
+            cv2.putText(img, 'distance between obj.: ' + str(distanceBetweenObject), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 0, 0))
 
             width = box2[0] +  box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
@@ -220,17 +253,9 @@ def findTape(img):
             switches.append((box1[0], yPoints[0], width, height))
 
 
-    cv2.putText(img, str(len(switches)), (300, temp_height), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+
     if len(switches) > 0:
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
-
-    """
-        distance = 5543.635 * math.pow(switches[0][2], -0.9634221)
-
-        q.put([True, distance])
-    else:
-        q.put([False, 0])
-    """
 
 def findCubes(img):
     contours = findContours(img, cubeHSV)
@@ -294,6 +319,10 @@ def findCargo(img):
 
     cameraTable.putBoolean('cargoFound', False)
 
+    cameraTable.putNumber('distanceToCargo', -1)
+    cameraTable.putNumber('cargoX', -1)
+    cameraTable.putNumber('cargoY', -1)
+
     if len(relevantXCenters) > 0:
         for circle in relevantXCenters:
             center = circle[0]
@@ -310,14 +339,16 @@ def findCargo(img):
 
             cv2.circle(img, (center_x, center_y), radius, color['neon'], 3)
 
+            distanceToCargo = 9.349483 + (144.9359 * math.exp(-0.006633269 * int(diameter)))
+
             cameraTable.putBoolean('cargoFound', True)
 
+            cameraTable.putNumber('distanceToCargo', int(distanceToCargo))
             cameraTable.putNumber('cargoX', center_x)
             cameraTable.putNumber('cargoY', center_y)
 
-            distance = (-0.05990983 * int(diameter)) + 59.83871
-            cv2.putText(img, 'distance: ' +  str(distance), (360, 360), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
-            cameraTable.putNumber('distanceToCargo', distance)
+            #cameraTable.putNumber('distanceToCargo', distance)
 
 if __name__  == '__main__':
     main()
+
