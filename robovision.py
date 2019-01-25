@@ -64,6 +64,7 @@ def main():
     server = cs.MjpegServer("cvhttpserver", 5801)
     server.setSource(cvSource)
 
+
     img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
     fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 
@@ -100,6 +101,60 @@ def main():
                     args=(findContours(fixed, cubeHSV), q)
                 )
                 p.start()
+
+    fs2 = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
+    cameraMatrix2 = fs.getNode('Camera_Matrix').mat()
+    distortionCoefficients2 = fs.getNode('Distortion_Coefficients').mat()
+    fs2.release()
+
+    camera2 = cs.UsbCamera("usbcam", 2)
+
+    camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+
+    cvSink2 = cs.CvSink("cvsink")
+    cvSink2.setSource(camera)
+
+    cvSource2 = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    server2 = cs.MjpegServer("cvhttpserver", 5802)
+    server2.setSource(cvSource2)
+
+    img2 = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+    fixed2 = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+
+    q2 = Queue()
+    p2 = None
+
+    while True:
+
+        time2, img2  = cvSink2.grabFrame(img2)
+        if time2 == 0:
+            print("Camera error:", cvSink2.getError())
+        else:
+            cv2.undistort(img2, cameraMatrix, distortionCoefficients2, dst=fixed)
+
+            #cv2.putText(img,"Howdy", (0,0), cv2.Font_Hershey_Simplex, 2,255)
+
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource2.putFrame(process(fixed))
+
+            p = Process(
+                target=findCubes,
+                args=(findContours(fixed, cubeHSV), q)
+            )
+            p.start()
+            print('Process started')
+            if not q.empty():
+                targets = q.get()
+
+            print(p)
+
+            if p is None or not p.is_alive():
+                p = Process(
+                    target=findCubes,
+                    args=(findContours(fixed, cubeHSV), q)
+                )
+                p.start()
+
 
 
 def process(src):
