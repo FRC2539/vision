@@ -9,6 +9,7 @@ from collections import namedtuple
 import math
 from multiprocessing import Process, Queue
 
+
 NetworkTables.initialize(server='roborio-2539-frc.local')
 
 cameraTable = NetworkTables.getTable('cameraInfo')
@@ -29,9 +30,19 @@ color = {
     'neon': Color(244, 134, 66)
 }
 
-tapeHSV = Threshold(
+'''
+        self.__hsv_threshold_hue = [0.0, 180.0]
+        self.__hsv_threshold_saturation = [0.0, 107.8013582342954]
+        self.__hsv_threshold_value = [222.4370503597122, 255.0]
+    tapeHSV = Threshold(
     HSV(0, 0, 235),
     HSV(102, 25, 255)
+)
+'''
+
+tapeHSV = Threshold(
+    HSV(0, 0, 222),
+    HSV(180, 107, 255)
 )
 
 cubeHSV = Threshold(
@@ -48,6 +59,170 @@ swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
 def main():
+    #rawCamera(0, 5801)
+    #rawCamera(1, 5802)
+    #rawCamera(2, 5803)
+    #rawCamera(3, 5804)
+
+    #setCamera()
+
+    #print("cameras going")
+
+    #while True:
+    #    t = 0
+
+
+    #rawCamera(0, 5801)
+    #rawCamera(1, 5802)
+    #rawCamera(2, 5803)
+    #rawCamera(3, 5804)
+
+
+
+    width=640
+    height=480
+    fps=30
+
+    '''
+    print("vars")
+
+    camera1 = cs.UsbCamera("usbcam", 0)
+    camera1.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    print("camera1")
+
+    mjpegServer1 = cs.MjpegServer("httpserver", 5801)
+    mjpegServer1.setSource(camera1)
+
+    print("mpg1")
+
+    cvsink1 = cs.CvSink("cvsink")
+    cvsink1.setSource(camera1)
+    '''
+    camera2 = cs.UsbCamera("usbcam", 2)
+    camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer2 = cs.MjpegServer("httpserver", 5802)
+    mjpegServer2.setSource(camera2)
+
+    cvsink2 = cs.CvSink("cvsink")
+    cvsink2.setSource(camera2)
+
+
+    setCamera()
+
+    while True:
+        #print("running cameras")
+        i = 11
+
+    #print("end")
+
+
+    '''
+
+    cs = CameraServer.getInstance()
+    #cs.EnableLogging()
+
+    usb1 = cs.startAutomaticCapture(dev=1)
+    usb2 = cs.startAutomaticCapture(dev=2)
+
+    cvSink = cs1.CvSink("cvsink")
+    cvSink.setSource(usb1)
+
+    cvSource = cs1.CvSource("cvsource", cs1.VideoMode.PixelFormat.kMJPEG, 320, 240, 30)
+    usb1 = cs1.MjpegServer("cvhttpserver", 5801)
+    usb1.setSource(cvSource)
+
+    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+
+    while True:
+
+        time, img  = cvSink.grabFrame(img)
+        if time == 0:
+            print("Camera error:", cvSink.getError())
+        else:
+            #cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
+
+
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource.putFrame(fixed)
+
+
+    cvSink1 = cs1.CvSink("cvsink")
+    cvSink1.setSource(usb2)
+
+    cvSource1 = cs1.CvSource("cvsource", cs1.VideoMode.PixelFormat.kMJPEG, 320, 240, 30)
+    usb2 = cs1.MjpegServer("cvhttpserver", 5802)
+    usb2.setSource(cvSource1)
+
+    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+
+    while True:
+
+        time, img  = cvSink.grabFrame(img)
+        if time == 0:
+            print("Camera error:", cvSink.getError())
+        else:
+            #cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
+
+
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource1.putFrame(fixed)
+
+
+
+    cs.waitForever()
+
+    '''
+
+    #cs = CameraServer.getInstance()
+    #cs.EnableLogging()
+    #usb1 = cs1.startAutomaticCapture
+    #usb1.setResolution(320,240)
+    #cvSink = cs1.getVideo()
+    #outputStream = cs1.putVideo("Name",320,240)
+    #img = np.zeros(shape=(240,320,3),dtype=np.uit8)
+    #while True:
+    #    time,img = cvSink.grabFrame(img)
+    #    if time == 0:
+    #        outputStream.notifyError(cvSink.getError());
+    #        continue
+
+
+
+
+    #setCamera()
+    #setCamera2()
+
+
+def rawCamera(cameraId, serverPort):
+    print("starting camera-"+str(cameraId))
+
+    width=320
+    height=240
+    fps=15
+
+
+
+    camera = cs.UsbCamera("usbcam", cameraId)
+    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    print("camera"+str(cameraId))
+
+    mjpegServer = cs.MjpegServer("httpserver", serverPort)
+    mjpegServer.setSource(camera)
+
+    print("mpg")
+
+    cvsink1 = cs.CvSink("cvsink")
+    cvsink1.setSource(camera)
+
+
+
+def setCamera():
+    print("starting process camera")
     fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
     cameraMatrix = fs.getNode('Camera_Matrix').mat()
     distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
@@ -71,7 +246,10 @@ def main():
     q = Queue()
     p = None
 
+    print("cameras on")
+
     while True:
+
 
         time, img  = cvSink.grabFrame(img)
         if time == 0:
@@ -79,7 +257,63 @@ def main():
         else:
             cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
 
-            #cv2.putText(img,"Howdy", (0,0), cv2.Font_Hershey_Simplex, 2,255)
+
+            #Replace process() call on fixed if vision processing is desired.
+            cvSource.putFrame(process(fixed))
+
+            '''
+            p = Process(
+                target=findCubes,
+                args=(findContours(fixed, cubeHSV), q)
+            )
+            p.start()
+            print('Process started')
+            if not q.empty():
+                targets = q.get()
+
+            #print(p)
+
+            if p is None or not p.is_alive():
+                p = Process(
+                    target=findCubes,
+                    args=(findContours(fixed, cubeHSV), q)
+                )
+                p.start()
+            '''
+
+
+def setCamera2():
+    fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
+    cameraMatrix = fs.getNode('Camera_Matrix').mat()
+    distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
+    fs.release()
+
+    camera = cs.UsbCamera("usbcam", 2)
+
+    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 320, 240, 12)
+
+    cvSink = cs.CvSink("cvsink")
+    cvSink.setSource(camera)
+
+    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 320, 240, 12)
+    server = cs.MjpegServer("cvhttpserver", 5802)
+    server.setSource(cvSource)
+
+
+    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
+
+    q = Queue()
+    p = None
+
+    while True:
+        print("looping")
+        time, img  = cvSink.grabFrame(img)
+        if time == 0:
+            print("Camera error:", cvSink.getError())
+        else:
+            cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
+
 
             #Replace process() call on fixed if vision processing is desired.
             cvSource.putFrame(process(fixed))
@@ -101,66 +335,12 @@ def main():
                     args=(findContours(fixed, cubeHSV), q)
                 )
                 p.start()
-
-    fs2 = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
-    cameraMatrix2 = fs.getNode('Camera_Matrix').mat()
-    distortionCoefficients2 = fs.getNode('Distortion_Coefficients').mat()
-    fs2.release()
-
-    camera2 = cs.UsbCamera("usbcam", 2)
-
-    camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-
-    cvSink2 = cs.CvSink("cvsink")
-    cvSink2.setSource(camera)
-
-    cvSource2 = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    server2 = cs.MjpegServer("cvhttpserver", 5802)
-    server2.setSource(cvSource2)
-
-    img2 = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-    fixed2 = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-
-    q2 = Queue()
-    p2 = None
-
-    while True:
-
-        time2, img2  = cvSink2.grabFrame(img2)
-        if time2 == 0:
-            print("Camera error:", cvSink2.getError())
-        else:
-            cv2.undistort(img2, cameraMatrix, distortionCoefficients2, dst=fixed)
-
-            #cv2.putText(img,"Howdy", (0,0), cv2.Font_Hershey_Simplex, 2,255)
-
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource2.putFrame(process(fixed))
-
-            p = Process(
-                target=findCubes,
-                args=(findContours(fixed, cubeHSV), q)
-            )
-            p.start()
-            print('Process started')
-            if not q.empty():
-                targets = q.get()
-
-            print(p)
-
-            if p is None or not p.is_alive():
-                p = Process(
-                    target=findCubes,
-                    args=(findContours(fixed, cubeHSV), q)
-                )
-                p.start()
-
-
+    print("done with looping")
 
 def process(src):
     findTape(src)
     #findCubes(src)
-    findCargo(src)
+    #findCargo(src)
 
     return src
 
@@ -254,7 +434,7 @@ def findTape(img):
     switches = []
 
 
-    while len(relevant) > 1:
+    while len(relevant) > .25:
         cameraTable.putBoolean('tapeFound', False)
         cameraTable.putNumber('distanceToTape', -1)
         cameraTable.putNumber('tapeX', -1)
@@ -268,7 +448,7 @@ def findTape(img):
                 continue
 
             # Are the boxes the same size?
-            if abs(box1[3] - box2[3]) > .35 * box1[3]:
+            if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
             if box1[0] > box2[0]:
@@ -312,7 +492,8 @@ def findTape(img):
     if len(switches) > 0:
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
-def findCubes(img):
+
+def findCubes(img,none):
     contours = findContours(img, cubeHSV)
     relevant = []
     target = None
@@ -352,6 +533,7 @@ def findCubes(img):
         cameraTable.putNumber('cubeDistance', int(distance))
         print(distance)
 
+
 def findCargo(img):
     relevantXCenters = []
     relevantYCenters = []
@@ -386,7 +568,7 @@ def findCargo(img):
             radius = int(circle[1])
             diameter = radius * 2
 
-            if radius < 80:
+            if radius < -10:
                 continue
 
             string = 'Center: ' + str(center_x) + ', ' + str(center_y) + ':' + ' Diameter: ' + str(diameter)
@@ -406,4 +588,3 @@ def findCargo(img):
 
 if __name__  == '__main__':
     main()
-
