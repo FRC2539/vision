@@ -8,6 +8,9 @@ from networktables import NetworkTables
 from collections import namedtuple
 import math
 from multiprocessing import Process, Queue
+import greencargo
+import tapevision
+import tapePipeline
 
 
 NetworkTables.initialize(server='roborio-2539-frc.local')
@@ -59,46 +62,13 @@ swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
 def main():
-    #rawCamera(0, 5801)
-    #rawCamera(1, 5802)
-    #rawCamera(2, 5803)
-    #rawCamera(3, 5804)
 
-    #setCamera()
-
-    #print("cameras going")
-
-    #while True:
-    #    t = 0
-
-
-    #rawCamera(0, 5801)
-    #rawCamera(1, 5802)
-    #rawCamera(2, 5803)
-    #rawCamera(3, 5804)
-
-
+    #raw 2nd camera test, no processing, put first so it executes before infinite loop for processing
 
     width=640
     height=480
     fps=30
 
-    '''
-    print("vars")
-
-    camera1 = cs.UsbCamera("usbcam", 0)
-    camera1.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    print("camera1")
-
-    mjpegServer1 = cs.MjpegServer("httpserver", 5801)
-    mjpegServer1.setSource(camera1)
-
-    print("mpg1")
-
-    cvsink1 = cs.CvSink("cvsink")
-    cvsink1.setSource(camera1)
-    '''
     camera2 = cs.UsbCamera("usbcam", 2)
     camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
@@ -108,116 +78,9 @@ def main():
     cvsink2 = cs.CvSink("cvsink")
     cvsink2.setSource(camera2)
 
-
+    #processed camera
     setCamera()
 
-    while True:
-        #print("running cameras")
-        i = 11
-
-    #print("end")
-
-
-    '''
-
-    cs = CameraServer.getInstance()
-    #cs.EnableLogging()
-
-    usb1 = cs.startAutomaticCapture(dev=1)
-    usb2 = cs.startAutomaticCapture(dev=2)
-
-    cvSink = cs1.CvSink("cvsink")
-    cvSink.setSource(usb1)
-
-    cvSource = cs1.CvSource("cvsource", cs1.VideoMode.PixelFormat.kMJPEG, 320, 240, 30)
-    usb1 = cs1.MjpegServer("cvhttpserver", 5801)
-    usb1.setSource(cvSource)
-
-    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-
-    while True:
-
-        time, img  = cvSink.grabFrame(img)
-        if time == 0:
-            print("Camera error:", cvSink.getError())
-        else:
-            #cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
-
-
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource.putFrame(fixed)
-
-
-    cvSink1 = cs1.CvSink("cvsink")
-    cvSink1.setSource(usb2)
-
-    cvSource1 = cs1.CvSource("cvsource", cs1.VideoMode.PixelFormat.kMJPEG, 320, 240, 30)
-    usb2 = cs1.MjpegServer("cvhttpserver", 5802)
-    usb2.setSource(cvSource1)
-
-    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-
-    while True:
-
-        time, img  = cvSink.grabFrame(img)
-        if time == 0:
-            print("Camera error:", cvSink.getError())
-        else:
-            #cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
-
-
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource1.putFrame(fixed)
-
-
-
-    cs.waitForever()
-
-    '''
-
-    #cs = CameraServer.getInstance()
-    #cs.EnableLogging()
-    #usb1 = cs1.startAutomaticCapture
-    #usb1.setResolution(320,240)
-    #cvSink = cs1.getVideo()
-    #outputStream = cs1.putVideo("Name",320,240)
-    #img = np.zeros(shape=(240,320,3),dtype=np.uit8)
-    #while True:
-    #    time,img = cvSink.grabFrame(img)
-    #    if time == 0:
-    #        outputStream.notifyError(cvSink.getError());
-    #        continue
-
-
-
-
-    #setCamera()
-    #setCamera2()
-
-
-def rawCamera(cameraId, serverPort):
-    print("starting camera-"+str(cameraId))
-
-    width=320
-    height=240
-    fps=15
-
-
-
-    camera = cs.UsbCamera("usbcam", cameraId)
-    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    print("camera"+str(cameraId))
-
-    mjpegServer = cs.MjpegServer("httpserver", serverPort)
-    mjpegServer.setSource(camera)
-
-    print("mpg")
-
-    cvsink1 = cs.CvSink("cvsink")
-    cvsink1.setSource(camera)
 
 
 
@@ -247,6 +110,11 @@ def setCamera():
     p = None
 
     print("cameras on")
+
+
+
+    print("running pipeline")
+
 
     while True:
 
@@ -282,65 +150,14 @@ def setCamera():
             '''
 
 
-def setCamera2():
-    fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
-    cameraMatrix = fs.getNode('Camera_Matrix').mat()
-    distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
-    fs.release()
 
-    camera = cs.UsbCamera("usbcam", 2)
-
-    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 320, 240, 12)
-
-    cvSink = cs.CvSink("cvsink")
-    cvSink.setSource(camera)
-
-    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 320, 240, 12)
-    server = cs.MjpegServer("cvhttpserver", 5802)
-    server.setSource(cvSource)
-
-
-    img = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-    fixed = np.zeros(shape=(240, 320, 3), dtype=np.uint8)
-
-    q = Queue()
-    p = None
-
-    while True:
-        print("looping")
-        time, img  = cvSink.grabFrame(img)
-        if time == 0:
-            print("Camera error:", cvSink.getError())
-        else:
-            cv2.undistort(img, cameraMatrix, distortionCoefficients, dst=fixed)
-
-
-            #Replace process() call on fixed if vision processing is desired.
-            cvSource.putFrame(process(fixed))
-
-            p = Process(
-                target=findCubes,
-                args=(findContours(fixed, cubeHSV), q)
-            )
-            p.start()
-            print('Process started')
-            if not q.empty():
-                targets = q.get()
-
-            print(p)
-
-            if p is None or not p.is_alive():
-                p = Process(
-                    target=findCubes,
-                    args=(findContours(fixed, cubeHSV), q)
-                )
-                p.start()
-    print("done with looping")
 
 def process(src):
-    findTape(src)
+    #findTape(src)
     #findCubes(src)
     #findCargo(src)
+
+    findTape2(src)
 
     return src
 
@@ -361,8 +178,30 @@ def findContours(img, threshhold):
 
     return contours
 
+pipeline = tapePipeline.GripPipeline()
+
+def findTape2(img):
+
+    pipeline.process(img)
+    #pl = pipeline.process(img)
+    #print("got pl-" + str(pl))
+
+    #if pipeline:
+        #print("got pl")
+        #contours = pl.filter_contours_output filter_contours_output
+        #contours = pipeline.filter_contours_output()
+    #else:
+        #print("no pl")
+    for contour in pipeline.filter_contours_output:
+        #print("got contour")
+        x, y, w, h = cv2.boundingRect(contour)
+        #print("x-"+str(x))
+        cv2.drawContours(img, contour, -1, color['red'])
+        cv2.circle(img, (x, y), 10, color['neon'], 3)
+
 
 def findTape(img):
+
 
     contours = findContours(img, tapeHSV)
     cv2.drawContours(img, contours, -1, color['gray'])
