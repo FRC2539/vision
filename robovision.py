@@ -8,10 +8,19 @@ from networktables import NetworkTables
 from collections import namedtuple
 import math
 from multiprocessing import Process, Queue
-import greencargo
-import tapevision
-import tapePipeline
+from pipelines import greentapehsv
 
+import socket
+#import argparse
+#parser = argparse.ArgumentParser("simple_udp_example")
+#parser.add_argument("message", help="Message to Send.", type=str)
+#args = parser.parse_args()
+#print(args.counter + 1)
+
+UDP_IP = "10.25.39.36"
+UDP_PORT = 5809
+
+pipeline = greentapehsv.GripPipeline()
 
 NetworkTables.initialize(server='roborio-2539-frc.local')
 
@@ -41,11 +50,19 @@ color = {
     HSV(0, 0, 235),
     HSV(102, 25, 255)
 )
+self.__hsv_threshold_hue = [85.79136690647482, 95.52901023890786]
+        self.__hsv_threshold_saturation = [0.0, 152.73890784982936]
+        self.__hsv_threshold_value = [176.30978570193577, 254.7360446947415]
+
+        tapeHSV = Threshold(
+    HSV(0, 0, 222),
+    HSV(180, 107, 255)
+)
 '''
 
 tapeHSV = Threshold(
-    HSV(0, 0, 222),
-    HSV(180, 107, 255)
+    HSV(85, 0, 176),
+    HSV(95, 152, 254)
 )
 
 cubeHSV = Threshold(
@@ -65,9 +82,9 @@ def main():
 
     #raw 2nd camera test, no processing, put first so it executes before infinite loop for processing
 
-    width=640
-    height=480
-    fps=30
+    width=320
+    height=240
+    fps=15
 
     camera2 = cs.UsbCamera("usbcam", 2)
     camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
@@ -93,7 +110,13 @@ def setCamera():
 
     camera = cs.UsbCamera("usbcam", 0)
 
-    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
+    camera.getProperty("exposure_auto").set(1)
+    camera.getProperty("exposure_absolute").set(1)
+    camera.getProperty("gamma").set(72)
+    camera.getProperty("white_balance_temperature_auto").set(0)
+    camera.getProperty("brightness").set(20)
+
+    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 15)
 
     cvSink = cs.CvSink("cvsink")
     cvSink.setSource(camera)
@@ -155,7 +178,7 @@ def setCamera():
 def process(src):
     #findTape(src)
     #findCubes(src)
-    #findCargo(src)
+    findCargo(src)
 
     findTape2(src)
 
@@ -178,7 +201,7 @@ def findContours(img, threshhold):
 
     return contours
 
-pipeline = tapePipeline.GripPipeline()
+
 
 def findTape2(img):
 
@@ -192,18 +215,16 @@ def findTape2(img):
         #contours = pipeline.filter_contours_output()
     #else:
         #print("no pl")
-    for contour in pipeline.filter_contours_output:
+    '''
+    for contour in pipeline.find_contours_output:
         #print("got contour")
         x, y, w, h = cv2.boundingRect(contour)
         #print("x-"+str(x))
         cv2.drawContours(img, contour, -1, color['red'])
         cv2.circle(img, (x, y), 10, color['neon'], 3)
+    '''
 
-
-def findTape(img):
-
-
-    contours = findContours(img, tapeHSV)
+    contours = pipeline.find_contours_output #findContours(img, tapeHSV)
     cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
     temp_height = 350
@@ -218,55 +239,7 @@ def findTape(img):
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
 
-    """
-    In theory:
-    Box1[0] = x
-    Box1[1] = y
-    Box1[2] = width
-    Box1[3] = height
-    """
 
-    """
-        if box[1][0] < box[1][1]:
-            # Ignore if too rotated
-            if box[2] < -10:
-                continue
-
-            # Ignore if too skinny
-            if box[1][0] < 5.0:
-                continue
-
-            ratio = box[1][0] / box[1][1]
-
-        else:
-            # Ignore if too rotated
-            if box[2] > -80:
-                continue
-
-            # Ignore if too skinny
-            if box[1][1] < 5.0:
-                continue
-
-            ratio = box[1][1] / box[1][0]
-
-        # Ignore if wrong shape (2" x 15.3")
-        if ratio < 0.08 or ratio > 0.2:
-            continue
-
-        # Ignore if too concave
-        hull = cv2.convexHull(contour)
-        solidity = area / cv2.contourArea(hull)
-        if solidity < 0.8:
-            continue
-
-
-    # We need at least 2 boxes to make a target
-
-    if  len(relevant) < 2:
-        q.put([False, 0])
-        return
-
-    """
 
     relevant.sort(key=lambda x: x[0])
     cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
@@ -305,12 +278,108 @@ def findTape(img):
 
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
-            hasTape = True
-            cameraTable.putBoolean('tapeFound', hasTape)
 
-            if hasTape:
-                cameraTable.putNumber('tapeX', finalCenter)
-                cameraTable.putNumber('distanceToTape', int(distance))
+
+            cv2.putText(img, 'x: ' + str(finalCenter), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 0, 0))
+
+            width = box2[0] +  box2[2] - box1[0]
+            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
+            yPoints.sort()
+            height = yPoints[3] - yPoints[0]
+            ratio = width / height
+
+            # Ignore if wrong shape (8" x 15.3")
+            #if ratio < 0.3 or ratio > 0.6:
+             #   continue
+
+            switches.append((box1[0], yPoints[0], width, height))
+
+
+    tMessage = ""
+    hasTape = False
+    tapeX = -1
+    tapeDistance = -1
+
+    if len(switches) > 0:
+
+        hasTape = True
+        cameraTable.putBoolean('tapeFound', hasTape)
+
+        if hasTape:
+            cameraTable.putNumber('tapeX', finalCenter)
+            cameraTable.putNumber('distanceToTape', int(distance))
+
+        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
+    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
+    sendUdp(tMessage)
+
+def sendUdp(message):
+
+    print("sending udp message:" +  str(message))
+
+    #for i in range(1000):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.sendto(message.encode('utf-8'), (UDP_IP, UDP_PORT))
+
+def findTape(img):
+
+
+    contours = findContours(img, tapeHSV)
+    cv2.drawContours(img, contours, -1, color['gray'])
+    relevant = []
+    temp_height = 350
+    cameraTable.putBoolean('tapeFound', False)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 25:
+            continue
+
+        box = cv2.minAreaRect(contour)
+        # Checks if width is less than height.
+        relevant.append(cv2.boundingRect(contour))
+
+
+
+    relevant.sort(key=lambda x: x[0])
+    cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255))
+    switches = []
+
+
+    while len(relevant) > .50:
+        cameraTable.putBoolean('tapeFound', False)
+        cameraTable.putNumber('distanceToTape', -1)
+        cameraTable.putNumber('tapeX', -1)
+
+        box1 = relevant.pop(0)
+        i_hate_this_code = 200
+        for box2 in relevant:
+
+            # Are the boxes next to each other?
+
+            if abs(box1[1] - box2[1]) > .25 * box1[3]:
+                continue
+
+            # Are the boxes the same size?
+            if abs(box1[3] - box2[3]) > .25 * box1[3]:
+                continue
+
+            if box1[0] > box2[0]:
+                greaterXVal = box1[0]
+                smallerXVal = box2[0]
+            else:
+                greaterXVal = box2[0]
+                smallerXVal = box1[0]
+
+            displacement = greaterXVal - smallerXVal
+            centerDisplacement = displacement / 2
+            finalCenter = smallerXVal + centerDisplacement
+
+            distanceBetweenObject = abs(box1[0] - box2[0])
+
+            distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
+
+
 
             cv2.putText(img, 'distance between obj.: ' + str(distanceBetweenObject), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 0, 0))
 
@@ -329,6 +398,12 @@ def findTape(img):
 
 
     if len(switches) > 0:
+        hasTape = True
+        cameraTable.putBoolean('tapeFound', hasTape)
+
+        if hasTape:
+            cameraTable.putNumber('tapeX', finalCenter)
+            cameraTable.putNumber('distanceToTape', int(distance))
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
 

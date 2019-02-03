@@ -111,15 +111,7 @@ class GripPipeline:
         Return:
             A list of numpy.ndarray where each one represents a contour.
         """
-        print('in program
-
-
-
-
-
-
-
-            ')
+        print('in program')
         if(external_only):
             mode = cv2.RETR_EXTERNAL
         else:
