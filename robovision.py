@@ -17,7 +17,7 @@ import socket
 #args = parser.parse_args()
 #print(args.counter + 1)
 
-UDP_IP = "10.25.39.36"
+UDP_IP = "10.25.39.2"
 UDP_PORT = 5809
 
 pipeline = greentapehsv.GripPipeline()
@@ -114,7 +114,7 @@ def setCamera():
     camera.getProperty("exposure_absolute").set(1)
     camera.getProperty("gamma").set(72)
     camera.getProperty("white_balance_temperature_auto").set(0)
-    camera.getProperty("brightness").set(20)
+    camera.getProperty("brightness").set(35)
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 15)
 
@@ -242,11 +242,13 @@ def findTape2(img):
 
 
     relevant.sort(key=lambda x: x[0])
-    cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+    #cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
     switches = []
 
+    finalCenter = 0
+    distance = 0
 
-    while len(relevant) > .25:
+    while len(relevant) > .5:
         cameraTable.putBoolean('tapeFound', False)
         cameraTable.putNumber('distanceToTape', -1)
         cameraTable.putNumber('tapeX', -1)
@@ -274,13 +276,20 @@ def findTape2(img):
             centerDisplacement = displacement / 2
             finalCenter = smallerXVal + centerDisplacement
 
+
+
             distanceBetweenObject = abs(box1[0] - box2[0])
 
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
 
 
-            cv2.putText(img, 'x: ' + str(finalCenter), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 0, 0))
+
+
+            cv2.putText(img, 'd: ' + str(distance), (100, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+            #tapeX = (finalCenter - (640/2))/640 * 5
+            #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
             width = box2[0] +  box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
@@ -298,19 +307,28 @@ def findTape2(img):
     tMessage = ""
     hasTape = False
     tapeX = -1
-    tapeDistance = -1
+    tapeDistance = 0
 
-    if len(switches) > 0:
+    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
+    if len(switches) == 1:
         hasTape = True
+
         cameraTable.putBoolean('tapeFound', hasTape)
 
-        if hasTape:
-            cameraTable.putNumber('tapeX', finalCenter)
-            cameraTable.putNumber('distanceToTape', int(distance))
+        cameraTable.putNumber('tapeX', finalCenter)
+        cameraTable.putNumber('distanceToTape', int(distance))
+        tapeX = (finalCenter - (640/2))/640 * 35
+        tapeDistance = int(distance)
+
+        cv2.putText(img, 'tapex: ' + str(tapeX), (50, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
+
+
     tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
+
+
     sendUdp(tMessage)
 
 def sendUdp(message):
