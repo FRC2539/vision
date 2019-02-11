@@ -112,9 +112,9 @@ def setCamera():
 
     camera.getProperty("exposure_auto").set(1)
     camera.getProperty("exposure_absolute").set(1)
-    camera.getProperty("gamma").set(72)
+    camera.getProperty("gamma").set(52) #12 day or 52 night
     camera.getProperty("white_balance_temperature_auto").set(0)
-    camera.getProperty("brightness").set(35)
+    camera.getProperty("brightness").set(40) #20 day or 40 night
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 15)
 
