@@ -112,9 +112,9 @@ def setCamera():
 
     camera.getProperty("exposure_auto").set(1)
     camera.getProperty("exposure_absolute").set(1)
-    camera.getProperty("gamma").set(52) #12 day or 52 night
+    camera.getProperty("gamma").set(65) #12 day or 52 night
     camera.getProperty("white_balance_temperature_auto").set(0)
-    camera.getProperty("brightness").set(40) #20 day or 40 night
+    camera.getProperty("brightness").set(65) #20 day or 40 night
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 15)
 
@@ -179,6 +179,7 @@ def process(src):
     #findTape(src)
     #findCubes(src)
     findCargo(src)
+    findSingleTape(src)
 
     findTape2(src)
 
@@ -238,7 +239,7 @@ def findTape2(img):
         box = cv2.minAreaRect(contour)
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
-
+        topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
 
 
     relevant.sort(key=lambda x: x[0])
@@ -265,9 +266,13 @@ def findTape2(img):
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
+
+
+
             if box1[0] > box2[0]:
                 greaterXVal = box1[0]
                 smallerXVal = box2[0]
+
             else:
                 greaterXVal = box2[0]
                 smallerXVal = box1[0]
@@ -283,18 +288,17 @@ def findTape2(img):
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
 
-
-
-
-            cv2.putText(img, 'd: ' + str(distance), (100, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
             #tapeX = (finalCenter - (640/2))/640 * 5
             #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+
 
             width = box2[0] +  box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
+
             height = yPoints[3] - yPoints[0]
+
             ratio = width / height
 
             # Ignore if wrong shape (8" x 15.3")
@@ -311,7 +315,7 @@ def findTape2(img):
 
     cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
-    if len(switches) == 1:
+    if len(switches) >= 0:
         hasTape = True
 
         cameraTable.putBoolean('tapeFound', hasTape)
@@ -321,9 +325,208 @@ def findTape2(img):
         tapeX = (finalCenter - (640/2))/640 * 35
         tapeDistance = int(distance)
 
-        cv2.putText(img, 'tapex: ' + str(tapeX), (50, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        bottomRightX = int(topLeftX + width)
+        bottomRightY = int(topLeftY + height)
+
+        """
+        centerX = box1[0]
+        centerY = box1[1]
+        width = box1[2]
+        height = box1[3]
+        """
+
+        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 26), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
+
+        cv2.rectangle(img, (topLeftX, topLeftY), (topLeftX + width, topLeftY + height), (0, 0, 255), 3)
+#        cv2.rectangle(img, (switches[0][0], switches[0][1]), (400, 240), color['red'], 3)
+
+
+
+        cv2.putText(img, 'C', (bottomRightX, bottomRightY), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+
+    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
+
+
+    sendUdp(tMessage)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def findSingleTape(img):
+
+    pipeline.process(img)
+    #pl = pipeline.process(img)
+    #print("got pl-" + str(pl))
+
+    #if pipeline:
+        #print("got pl")
+        #contours = pl.filter_contours_output filter_contours_output
+        #contours = pipeline.filter_contours_output()
+    #else:
+        #print("no pl")
+    '''
+    for contour in pipeline.find_contours_output:
+        #print("got contour")
+        x, y, w, h = cv2.boundingRect(contour)
+        #print("x-"+str(x))
+        cv2.drawContours(img, contour, -1, color['red'])
+        cv2.circle(img, (x, y), 10, color['neon'], 3)
+    '''
+
+    contours = pipeline.find_contours_output #findContours(img, tapeHSV)
+    cv2.drawContours(img, contours, -1, color['gray'])
+    relevant = []
+    temp_height = 350
+    cameraTable.putBoolean('tapeFound', False)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 25:
+            continue
+
+        box = cv2.minAreaRect(contour)
+        # Checks if width is less than height.
+        relevant.append(cv2.boundingRect(contour))
+        try:
+            if relevant[0][2] > 50:
+                continue
+            else:
+                topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
+        except IndexError:
+            continue
+
+    relevant.sort(key=lambda x: x[0])
+    #cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
+    switches = []
+
+    finalCenter = 0
+    distance = 0
+
+    while len(relevant) > .5:
+        cameraTable.putBoolean('tapeFound', False)
+        cameraTable.putNumber('distanceToTape', -1)
+        cameraTable.putNumber('tapeX', -1)
+
+        box1 = relevant.pop(0)
+        i_hate_this_code = 200
+        for box2 in relevant:
+
+            # Are the boxes next to each other?
+            if abs(box1[1] - box2[1]) > .25 * box1[3]:
+                continue
+
+            # Are the boxes the same size?
+            if abs(box1[3] - box2[3]) > .25 * box1[3]:
+                continue
+
+
+
+
+            if box1[0] > box2[0]:
+                greaterXVal = box1[0]
+                smallerXVal = box2[0]
+
+            else:
+                greaterXVal = box2[0]
+                smallerXVal = box1[0]
+
+            displacement = greaterXVal - smallerXVal
+            centerDisplacement = displacement / 2
+            finalCenter = smallerXVal + centerDisplacement
+
+
+
+            distanceBetweenObject = abs(box1[0] - box2[0])
+
+            distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
+
+
+            #tapeX = (finalCenter - (640/2))/640 * 5
+            #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+
+
+            #width = box2[0] +  box2[2] - box1[0]
+            #yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
+            #yPoints.sort()
+            #height = yPoints[3] - yPoints[0]
+
+ #           ratio = width / height
+
+            # Ignore if wrong shape (8" x 15.3")
+            #if ratio < 0.3 or ratio > 0.6:
+             #   continue
+
+            #switches.append((box1[0], yPoints[0], width, height))
+
+
+    tMessage = ""
+    hasTape = False
+    tapeX = -1
+    tapeDistance = 0
+
+    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+    if len(switches) >= 0:
+        hasTape = True
+
+        cameraTable.putBoolean('tapeFound', hasTape)
+
+        cameraTable.putNumber('tapeX', finalCenter)
+        cameraTable.putNumber('distanceToTape', int(distance))
+        tapeX = (finalCenter - (640/2))/640 * 35
+        tapeDistance = int(distance)
+
+
+        """
+        centerX = box1[0]
+        centerY = box1[1]
+        width = box1[2]
+        height = box1[3]
+        """
+
+        bottomRightX = int(topLeftX + width)
+        bottomRightY = int(topLeftY + height)
+
+
+
+
+        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 26), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+      #  cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
+
+        cv2.rectangle(img, (topLeftX, topLeftY), (bottomRightX, bottomRightY), (0, 0, 255), 3)
+#        cv2.rectangle(img, (switches[0][0], switches[0][1]), (400, 240), color['red'], 3)
+
+
+
+        cv2.putText(img, 'C', (bottomRightX, bottomRightY), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
 
     tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
