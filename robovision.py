@@ -181,7 +181,7 @@ def process(src):
     findCargo(src)
     findSingleTape(src)
 
-    findTape2(src)
+    #findTape2(src)
 
     return src
 
@@ -379,6 +379,7 @@ def findTape2(img):
 def findSingleTape(img):
 
     pipeline.process(img)
+
     #pl = pipeline.process(img)
     #print("got pl-" + str(pl))
 
@@ -402,6 +403,10 @@ def findSingleTape(img):
     relevant = []
     temp_height = 350
     cameraTable.putBoolean('tapeFound', False)
+    bensBoxes = []
+    slantedBois = []
+    boxes = []
+    boxes2 = []
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -409,6 +414,7 @@ def findSingleTape(img):
             continue
 
         box = cv2.minAreaRect(contour)
+
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
         try:
@@ -416,6 +422,8 @@ def findSingleTape(img):
                 continue
             else:
                 topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
+                bensBoxes.append(cv2.boundingRect(contour))
+                slantedBois.append(cv2.minAreaRect(contour))
         except IndexError:
             continue
 
@@ -509,25 +517,65 @@ def findSingleTape(img):
         height = box1[3]
         """
 
+        topLeftX = bensBoxes[0][0]
+        topLeftY = bensBoxes[0][1]
+        width = bensBoxes[0][2]
+        height = bensBoxes[0][3]
+
+        topLeftX2 = bensBoxes[1][0]
+        topLeftY2 = bensBoxes[1][1]
+        width2 = bensBoxes[1][2]
+        height2 = bensBoxes[1][3]
+
         bottomRightX = int(topLeftX + width)
         bottomRightY = int(topLeftY + height)
 
+        bottomRightX2 = int(topLeftX2 + width2)
+        bottomRightY2 = int(topLeftY2 + height2)
 
+        try:
+            rect = slantedBois[0]
+            rect2 = slantedBois[1]
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            box2 = cv2.boxPoints(rect2)
+            box2 = np.int0(box2)
 
+            cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
+            cv2.drawContours(img, [box2], -1, (255, 0, 0), 3)
 
-        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 26), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        except IndexError:
+            pass
+
+        firstHeight = int(bensBoxes[0][3])
+        secondHeight = int(bensBoxes[1][3])
+        if firstHeight > secondHeight + 10:
+            cameraTable.putNumber('Alignment', 1)
+            cv2.putText(img, 'RIGHT MORE', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        elif firstHeight + 10 < secondHeight:
+            cameraTable.putNumber('Alignment', -1)
+            cv2.putText(img, 'LEFT MORE ', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        else:
+            cameraTable.putNumber('Alignment', 0)
+            cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
         cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
       #  cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
+
+        """     Uncomment this for vertical, individual rectangles.
+
         cv2.rectangle(img, (topLeftX, topLeftY), (bottomRightX, bottomRightY), (0, 0, 255), 3)
+        cv2.rectangle(img, (topLeftX2, topLeftY2), (bottomRightX2, bottomRightY2), (0, 0, 255), 3)
+
+        """
+
 #        cv2.rectangle(img, (switches[0][0], switches[0][1]), (400, 240), color['red'], 3)
-
-
-
-        cv2.putText(img, 'C', (bottomRightX, bottomRightY), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
 
     tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
 
@@ -591,28 +639,6 @@ def findTape(img):
             else:
                 greaterXVal = box2[0]
                 smallerXVal = box1[0]
-
-            displacement = greaterXVal - smallerXVal
-            centerDisplacement = displacement / 2
-            finalCenter = smallerXVal + centerDisplacement
-
-            distanceBetweenObject = abs(box1[0] - box2[0])
-
-            distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
-
-
-
-            cv2.putText(img, 'distance between obj.: ' + str(distanceBetweenObject), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 0, 0))
-
-            width = box2[0] +  box2[2] - box1[0]
-            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
-            yPoints.sort()
-            height = yPoints[3] - yPoints[0]
-            ratio = width / height
-
-            # Ignore if wrong shape (8" x 15.3")
-            #if ratio < 0.3 or ratio > 0.6:
-             #   continue
 
             switches.append((box1[0], yPoints[0], width, height))
 
