@@ -410,13 +410,24 @@ def findSingleTape(img):
 
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 25:
+
+        if area < 45:
             continue
 
-        box = cv2.minAreaRect(contour)
+        solidity = 100 * area / cv2.contourArea(cv2.convexHull(contour))
+
+        if solidity < 90.0:
+            continue
+
+        if cv2.boundingRect(contour)[2] >= cv2.boundingRect(contour)[3]:
+            continue
+
+
+        #box = cv2.minAreaRect(contour)
 
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
+        cv2.putText(img, 'elen' + str(len(relevant)), (200, 180), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
         try:
             if relevant[0][2] > 50:
                 continue
@@ -430,9 +441,19 @@ def findSingleTape(img):
     relevant.sort(key=lambda x: x[0])
     #cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255,255,255))
     switches = []
+    distances = []
+    chooseHeights = []
 
     finalCenter = 0
     distance = 0
+    cv2.putText(img, 'relevant length!!!' + str(len(relevant)), (200, 230), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+    def distanceCheck(distance, list):
+        for i in list:
+            if not distance < i:
+                return 1
+            else:
+                return 0
 
     while len(relevant) > .5:
         cameraTable.putBoolean('tapeFound', False)
@@ -440,7 +461,8 @@ def findSingleTape(img):
         cameraTable.putNumber('tapeX', -1)
 
         box1 = relevant.pop(0)
-        i_hate_this_code = 200
+        distances.append(box1[0])
+        print('relevant')
         for box2 in relevant:
 
             # Are the boxes next to each other?
@@ -451,9 +473,22 @@ def findSingleTape(img):
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
+            #TODO: Work out the kinks in the focusing on one object (below)
+            """
+            if abs(box1[1] - box2[1]) * 10 > 15:
+                continue
+
+            cv2.putText(img, 'difference: ' + str(abs(box1[2] - box2[2])), (box2[0], box2[1]), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+            """
 
 
-
+            """
+           # individualDistance =
+            chooseHeights.append(abs(box1[3] - box2[3]))
+            if len(chooseHeights) > 1:
+                if chooseHeights[0] < abs(box1[3] - box2[3]):
+                    continue
+            """
             if box1[0] > box2[0]:
                 greaterXVal = box1[0]
                 smallerXVal = box2[0]
@@ -472,34 +507,32 @@ def findSingleTape(img):
 
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
+            if not distanceCheck(distance, distances):
+                continue
+
+            distances.append(distance)
+
 
             #tapeX = (finalCenter - (640/2))/640 * 5
             #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
+           # width = relevant[0][2]
+            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
+            yPoints.sort()
+            height = yPoints[3] - yPoints[0]
+            width = box2[2]
 
 
-            #width = box2[0] +  box2[2] - box1[0]
-            #yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
-            #yPoints.sort()
-            #height = yPoints[3] - yPoints[0]
-
- #           ratio = width / height
-
-            # Ignore if wrong shape (8" x 15.3")
-            #if ratio < 0.3 or ratio > 0.6:
-             #   continue
-
-            #switches.append((box1[0], yPoints[0], width, height))
+            switches.append((box1[0], yPoints[0], width, height))
 
 
     tMessage = ""
     hasTape = False
     tapeX = -1
     tapeDistance = 0
+    cameraTable.putNumber('Alignment', -10)
 
-    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
-    if len(switches) >= 0:
+    if len(bensBoxes) > 0:
         hasTape = True
 
         cameraTable.putBoolean('tapeFound', hasTape)
@@ -516,24 +549,53 @@ def findSingleTape(img):
         width = box1[2]
         height = box1[3]
         """
-
-        topLeftX = bensBoxes[0][0]
-        topLeftY = bensBoxes[0][1]
-        width = bensBoxes[0][2]
-        height = bensBoxes[0][3]
-
-        topLeftX2 = bensBoxes[1][0]
-        topLeftY2 = bensBoxes[1][1]
-        width2 = bensBoxes[1][2]
-        height2 = bensBoxes[1][3]
-
-        bottomRightX = int(topLeftX + width)
-        bottomRightY = int(topLeftY + height)
-
-        bottomRightX2 = int(topLeftX2 + width2)
-        bottomRightY2 = int(topLeftY2 + height2)
+        firstHeight = int(bensBoxes[0][3])
 
         try:
+            secondHeight = int(bensBoxes[1][3])
+            chooseHeights.append((firstHeight, secondHeight))
+
+        except IndexError:
+            chooseHeights.append((firstHeight))
+
+        if len(bensBoxes) < 2 and len(bensBoxes) >= 1:
+
+            topLeftX = bensBoxes[0][0]
+            topLeftY = bensBoxes[0][1]
+            width = bensBoxes[0][2]
+            height = bensBoxes[0][3]
+
+            bottomRightX = int(topLeftX + width)
+            bottomRightY = int(topLeftY + height)
+
+            try:
+                rect = slantedBois[0]
+                box = cv2.boxPoints(rect)
+                box = np.int0(box)
+
+                cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
+
+            except IndexError:
+                pass
+
+        elif len(bensBoxes) >= 2:
+            topLeftX = bensBoxes[0][0]
+            topLeftY = bensBoxes[0][1]
+            width = bensBoxes[0][2]
+            height = bensBoxes[0][3]
+
+            topLeftX2 = bensBoxes[1][0]
+            topLeftY2 = bensBoxes[1][1]
+            width2 = bensBoxes[1][2]
+            height2 = bensBoxes[1][3]
+
+            bottomRightX = int(topLeftX + width)
+            bottomRightY = int(topLeftY + height)
+
+            bottomRightX2 = int(topLeftX2 + width2)
+            bottomRightY2 = int(topLeftY2 + height2)
+
+
             rect = slantedBois[0]
             rect2 = slantedBois[1]
             box = cv2.boxPoints(rect)
@@ -544,26 +606,30 @@ def findSingleTape(img):
             cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
             cv2.drawContours(img, [box2], -1, (255, 0, 0), 3)
 
-        except IndexError:
+        else:
             pass
 
-        firstHeight = int(bensBoxes[0][3])
-        secondHeight = int(bensBoxes[1][3])
-        if firstHeight > secondHeight + 10:
-            cameraTable.putNumber('Alignment', 1)
-            cv2.putText(img, 'RIGHT MORE', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        pixelSpan = abs(int(distance * 0.02))
 
-        elif firstHeight + 10 < secondHeight:
-            cameraTable.putNumber('Alignment', -1)
-            cv2.putText(img, 'LEFT MORE ', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        try:
+            if topLeftX < topLeftX2:
+                if height > height2:
+                    cameraTable.putString('Alignment', 'Go Right')
+                    cv2.putText(img, 'RIGHT MORE', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+                elif height2 > height:
+                    cameraTable.putString('Alignment', 'Go Left')
+                    cv2.putText(img, 'LEFT MORE ', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+                else:
+                    cameraTable.putString('Alignment', 'Aligned')
+                    cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
-        else:
-            cameraTable.putNumber('Alignment', 0)
-            cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+            else:
+                cameraTable.putString('Alignment', 'Aligned')
+                cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
-        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        except (IndexError, UnboundLocalError):
+            cameraTable.putString('Alignment', 'I only see one piece of tape')
 
-        cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
       #  cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
@@ -611,7 +677,6 @@ def findTape(img):
 
 
     relevant.sort(key=lambda x: x[0])
-    cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255))
     switches = []
 
 
