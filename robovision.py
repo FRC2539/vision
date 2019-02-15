@@ -86,6 +86,8 @@ def main():
     height=240
     fps=15
 
+    screenWidth = width
+
     camera2 = cs.UsbCamera("usbcam", 2)
     camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
@@ -179,7 +181,7 @@ def process(src):
     #findTape(src)
     #findCubes(src)
     findCargo(src)
-    findSingleTape(src)
+    findSingleTape(src, 320)
 
     #findTape2(src)
 
@@ -313,8 +315,6 @@ def findTape2(img):
     tapeX = -1
     tapeDistance = 0
 
-    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
     if len(switches) >= 0:
         hasTape = True
 
@@ -376,7 +376,7 @@ def findTape2(img):
 
 
 
-def findSingleTape(img):
+def findSingleTape(img, screenWidth):
 
     pipeline.process(img)
 
@@ -406,7 +406,6 @@ def findSingleTape(img):
     bensBoxes = []
     slantedBois = []
     boxes = []
-    boxes2 = []
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -422,19 +421,23 @@ def findSingleTape(img):
         if cv2.boundingRect(contour)[2] >= cv2.boundingRect(contour)[3]:
             continue
 
+        topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
+        slantedBois.append(cv2.minAreaRect(contour))
+
 
         #box = cv2.minAreaRect(contour)
 
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
-        cv2.putText(img, 'elen' + str(len(relevant)), (200, 180), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
         try:
             if relevant[0][2] > 50:
                 continue
             else:
-                topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
-                bensBoxes.append(cv2.boundingRect(contour))
-                slantedBois.append(cv2.minAreaRect(contour))
+                #topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
+                #bensBoxes.append(cv2.boundingRect(contour))
+                #slantedBois.append(cv2.minAreaRect(contour))
+                pass
         except IndexError:
             continue
 
@@ -446,7 +449,6 @@ def findSingleTape(img):
 
     finalCenter = 0
     distance = 0
-    cv2.putText(img, 'relevant length!!!' + str(len(relevant)), (200, 230), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
     def distanceCheck(distance, list):
         for i in list:
@@ -465,6 +467,14 @@ def findSingleTape(img):
         print('relevant')
         for box2 in relevant:
 
+            sizeLimit = box1[1] * 0.2
+            heightLimit = box1[3] * 0.5
+
+            #Are the boxes next two each other? 2.0!!!
+
+#            if abs(box1[0] - box2[0]) > .25 * box1[2]:
+ #               continue
+
             # Are the boxes next to each other?
             if abs(box1[1] - box2[1]) > .25 * box1[3]:
                 continue
@@ -472,6 +482,16 @@ def findSingleTape(img):
             # Are the boxes the same size?
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
+            """
+            # Funky, is there a box inside of a box?
+            if abs((box1[0] + box1[2] + sizeLimit)) > box2[0] and abs(box1[0] - sizeLimit) < box2[0]:
+                continue
+
+            if abs(box1[2] - box2[2]) > heightLimit:
+                continue
+            """
+            bensBoxes.append(box1)
+            bensBoxes.append(box2)
 
             #TODO: Work out the kinks in the focusing on one object (below)
             """
@@ -501,8 +521,6 @@ def findSingleTape(img):
             centerDisplacement = displacement / 2
             finalCenter = smallerXVal + centerDisplacement
 
-
-
             distanceBetweenObject = abs(box1[0] - box2[0])
 
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
@@ -511,7 +529,6 @@ def findSingleTape(img):
                 continue
 
             distances.append(distance)
-
 
             #tapeX = (finalCenter - (640/2))/640 * 5
             #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
@@ -522,7 +539,6 @@ def findSingleTape(img):
             height = yPoints[3] - yPoints[0]
             width = box2[2]
 
-
             switches.append((box1[0], yPoints[0], width, height))
 
 
@@ -532,7 +548,7 @@ def findSingleTape(img):
     tapeDistance = 0
     cameraTable.putNumber('Alignment', -10)
 
-    if len(bensBoxes) > 0:
+    if len(bensBoxes) > 1:
         hasTape = True
 
         cameraTable.putBoolean('tapeFound', hasTape)
@@ -557,6 +573,12 @@ def findSingleTape(img):
 
         except IndexError:
             chooseHeights.append((firstHeight))
+
+
+        #cv2.putText(img, ' LENGTH OF BB' + str(len(bensBoxes)), (200, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        print(str(len(bensBoxes)))
+
+        bensBoxes = sorted(bensBoxes, key=lambda box: box[0])
 
         if len(bensBoxes) < 2 and len(bensBoxes) >= 1:
 
@@ -595,7 +617,6 @@ def findSingleTape(img):
             bottomRightX2 = int(topLeftX2 + width2)
             bottomRightY2 = int(topLeftY2 + height2)
 
-
             rect = slantedBois[0]
             rect2 = slantedBois[1]
             box = cv2.boxPoints(rect)
@@ -603,16 +624,40 @@ def findSingleTape(img):
             box2 = cv2.boxPoints(rect2)
             box2 = np.int0(box2)
 
+            screenWidth *= 2
+            topRightX2Displacement = abs(screenWidth - (topLeftX2 + width2))
+            topRightX2Displacement = screenWidth - topRightX2Displacement
+
             cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
             cv2.drawContours(img, [box2], -1, (255, 0, 0), 3)
 
-        else:
-            pass
+        pixelSpan = int(abs(distance * 0.05))
 
-        pixelSpan = abs(int(distance * 0.02))
+        cv2.putText(img, ' left is...' + str(topLeftX), (topLeftX, topLeftY), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        cv2.putText(img, ' Right is...' + str(topRightX2Displacement), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+        if topLeftX > topRightX2Displacement:
+            val = topRightX2Displacement - topLeftX
+            cameraTable.putString('tapeStrafe', val)
+        else:
+            val = topLeftX - topRightX2Displacement
+            cameraTable.putString('tapeStrafe', val)
+        cv2.putText(img, ' screenWidth ' + str(val), (200, 260), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+        """
 
         try:
-            if topLeftX < topLeftX2:
+            if topLeftX + pixelSpan < topRightX2Displacement:
+                if height > height2:
+                    cameraTable.putString('Alignment', 'Go Right')
+                    cv2.putText(img, 'RIGHT MORE', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+                elif height2 > height:
+                    cameraTable.putString('Alignment', 'Go Left')
+                    cv2.putText(img, 'LEFT MORE ', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+                else:
+                    cameraTable.putString('Alignment', 'Aligned')
+                    cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+
+            elif topLeftX > topRightX2Displacement + pixelSpan:
                 if height > height2:
                     cameraTable.putString('Alignment', 'Go Right')
                     cv2.putText(img, 'RIGHT MORE', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
@@ -625,12 +670,12 @@ def findSingleTape(img):
 
             else:
                 cameraTable.putString('Alignment', 'Aligned')
-                cv2.putText(img, 'ALIGNED!!!', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+                cv2.putText(img, 'Aligned', (200, 140), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
         except (IndexError, UnboundLocalError):
             cameraTable.putString('Alignment', 'I only see one piece of tape')
 
-
+        """
       #  cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
 
