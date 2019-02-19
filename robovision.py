@@ -137,6 +137,7 @@ def setCamera():
     server.setSource(cvSource)
 
 
+
     img = np.zeros(shape=(processCameraHeight, processCameraWidth, 3), dtype=np.uint8)
     fixed = np.zeros(shape=(processCameraHeight, processCameraWidth, 3), dtype=np.uint8)
 
@@ -478,7 +479,7 @@ def findSingleTape(img, screenWidth):
                 cv2.putText(img, ' ERROR is...' + str(topLeftX), (320, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
                 continue
             """
-            """
+
             # Are the boxes next to each other?
             if abs(box1[1] - box2[1]) > .25 * box1[2]:
                 continue
@@ -486,7 +487,7 @@ def findSingleTape(img, screenWidth):
             # Are the boxes the same size?
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
-            """
+
             # Funky, is there a box inside of a box?
 
             if abs((box1[0] + box1[2] + sizeLimit)) > box2[0] and abs(box1[0] - sizeLimit) < box2[0]:
@@ -582,43 +583,44 @@ def findSingleTape(img, screenWidth):
         while moreThanTwo:
             bensBoxes = sorted(bensBoxes, key=lambda boxx:abs(boxx[0]-secondScreenWidth))
 
-            if len(bensBoxes) < 2 and len(bensBoxes) >= 1:
+            #if len(bensBoxes) < 2 and len(bensBoxes) >= 1:
 
-                topLeftX = bensBoxes[0][0]
-                topLeftY = bensBoxes[0][1]
-                width = bensBoxes[0][2]
-                height = bensBoxes[0][3]
+                #topLeftX = bensBoxes[0][0]
+                #topLeftY = bensBoxes[0][1]
+                #width = bensBoxes[0][2]
+                #height = bensBoxes[0][3]
 
-                bottomRightX = int(topLeftX + width)
-                bottomRightY = int(topLeftY + height)
+                #bottomRightX = int(topLeftX + width)
+                #bottomRightY = int(topLeftY + height)
 
-                topLeftX2 = 0
-                topLeftY2 = 0
+                #topLeftX2 = 0
+                #topLeftY2 = 0
 
-                topRightX2Displacement = 0
+                #topRightX2Displacement = 0
 
-                try:
-                    rect = slantedBois[0]
-                    box = cv2.boxPoints(rect)
-                    box = np.int0(box)
+                #try:
+                    #rect = slantedBois[0]
+                    #box = cv2.boxPoints(rect)
+                    #box = np.int0(box)
 
-                    cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
+                    #cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
 
 
-                except IndexError:
-                    pass
+                #except IndexError:
+                    #pass
 
             if len(bensBoxes) == 2:
                 bensBoxes = sorted(bensBoxes, key=lambda box: box[0])
-                topLeftX = bensBoxes[0][0]
-                topLeftY = bensBoxes[0][1]
-                width = bensBoxes[0][2]
-                height = bensBoxes[0][3]
+                finalBoxes = bensBoxes
+                topLeftX = finalBoxes[0][0]
+                topLeftY = finalBoxes[0][1]
+                width = finalBoxes[0][2]
+                height = finalBoxes[0][3]
 
-                topLeftX2 = bensBoxes[1][0]
-                topLeftY2 = bensBoxes[1][1]
-                width2 = bensBoxes[1][2]
-                height2 = bensBoxes[1][3]
+                topLeftX2 = finalBoxes[1][0]
+                topLeftY2 = finalBoxes[1][1]
+                width2 = finalBoxes[1][2]
+                height2 = finalBoxes[1][3]
 
                 bottomRightX = int(topLeftX + width)
                 bottomRightY = int(topLeftY + height)
@@ -639,15 +641,15 @@ def findSingleTape(img, screenWidth):
                 cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
                 cv2.drawContours(img, [box2], -1, (255, 0, 0), 3)
 
-                distanceBetweenObject = abs(bensBoxes[0][0] - bensBoxes[1][0])
+                distanceBetweenObject = abs(finalBoxes[0][0] - finalBoxes[1][0])
 
                 distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
                 moreThanTwo = False
 
             else:
-                if bensBoxes[0] == bensBoxes[1]:
-                    del bensBoxes[1]
-                bensBoxes = bensBoxes[0:2]
+                if finalBoxes[0] == finalBoxes[1]:
+                    del finalBoxes[1]
+                finalBoxes = finalBoxes[0:2]
                 continue
 
         pixelSpan = int(abs(distance * 0.02))
