@@ -97,7 +97,7 @@ def main():
 
     screenWidth = width
 
-    camera2 = cs.UsbCamera("usbcam", 2)
+    camera2 = cs.UsbCamera("usbcam", 1)
     camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
     mjpegServer2 = cs.MjpegServer("httpserver", 5802)
@@ -123,9 +123,9 @@ def setCamera():
 
     camera.getProperty("exposure_auto").set(1)
     camera.getProperty("exposure_absolute").set(1)
-    camera.getProperty("gamma").set(65) #12 day or 52 night
+    camera.getProperty("gamma").set(52) #12 day or 52 night
     camera.getProperty("white_balance_temperature_auto").set(0)
-    camera.getProperty("brightness").set(65) #20 day or 40 night
+    camera.getProperty("brightness").set(52) #20 day or 40 night
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, processCameraWidth, processCameraHeight, processCameraFps)
 
@@ -410,7 +410,7 @@ def findSingleTape(img, screenWidth):
     '''
 
     contours = pipeline.find_contours_output #findContours(img, tapeHSV)
-    cv2.drawContours(img, contours, -1, color['gray'])
+    cv2.drawContours(img, contours, -1, color['yellow'])
     relevant = []
     temp_height = 350
     cameraTable.putBoolean('tapeFound', False)
@@ -421,7 +421,9 @@ def findSingleTape(img, screenWidth):
     for contour in contours:
         area = cv2.contourArea(contour)
 
-        if area < 45:
+        if area < 60:
+
+            cv2.putText(img, ' AREA ERROR', (50, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
             continue
 
         solidity = 100 * area / cv2.contourArea(cv2.convexHull(contour))
@@ -643,10 +645,12 @@ def findSingleTape(img, screenWidth):
 
                 distanceBetweenObject = abs(finalBoxes[0][0] - finalBoxes[1][0])
 
-                distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
+                distance = 16.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
                 moreThanTwo = False
 
             else:
+                bensBoxes = sorted(bensBoxes, key=lambda box: box[0])
+                finalBoxes = bensBoxes
                 if finalBoxes[0] == finalBoxes[1]:
                     del finalBoxes[1]
                 finalBoxes = finalBoxes[0:2]
