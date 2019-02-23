@@ -26,15 +26,6 @@ NetworkTables.initialize(server='roborio-2539-frc.local')
 
 cameraTable = NetworkTables.getTable('cameraInfo')
 
-driveCameraWidth = 320
-driveCameraHeight = 240
-driveCameraFps = 15
-
-processCameraWidth = 640
-processCameraHeight = 480
-processCameraFps = 30
-
-
 HSV = namedtuple('HSV', ('H', 'S', 'V'))
 Threshold = namedtuple('Threshold', ('min', 'max'))
 Color = namedtuple('Color', ('blue', 'green', 'red'))
@@ -67,7 +58,7 @@ self.__hsv_threshold_hue = [85.79136690647482, 95.52901023890786]
     HSV(0, 0, 222),
     HSV(180, 107, 255)
 )
-'''
+
 
 tapeHSV = Threshold(
     HSV(85, 0, 176),
@@ -86,82 +77,28 @@ cargoHSV = Threshold(
 swapColor = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
 swapBW = np.zeros(shape=(480, 640, 1), dtype=np.uint8)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+'''
 
 def main():
 
     #raw 2nd camera test, no processing, put first so it executes before infinite loop for processing
 
-    width=640
-    height=480
-    fps=30
+    width=320
+    height=240
+    fps=5
 
-    '''
-    camera0 = cs.UsbCamera("usbcam", 0)
+    #cs.startAutomaticCapture(dev=None, name=None, path=None, camera=None, return_server=False)
+
+    camera0 = cs.UsbCamera("usbcam", 3)
     camera0.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
-    mjpegServer0 = cs.MjpegServer("httpserver", 5800)
+    mjpegServer0 = cs.MjpegServer("httpserver", 5801)
     mjpegServer0.setSource(camera0)
 
-    cvsink0 = cs.CvSink("cvsink")
-    cvsink0.setSource(camera0)
+    #cvsink0 = cs.CvSink("cvsink")
+    #cvsink0.setSource(camera0)
 
 
-    camera1 = cs.UsbCamera("usbcam", 1)
-    camera1.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    mjpegServer1 = cs.MjpegServer("httpserver", 5801)
-    mjpegServer1.setSource(camera1)
-
-    cvsink1 = cs.CvSink("cvsink")
-    cvsink1.setSource(camera1)
-
-
-
-    camera2 = cs.UsbCamera("usbcam", 1)
-    camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    mjpegServer2 = cs.MjpegServer("httpserver", 5803)
-    mjpegServer2.setSource(camera2)
-
-    cvsink2 = cs.CvSink("cvsink")
-    cvsink2.setSource(camera2)
-
-
-
-
-    camera3 = cs.UsbCamera("usbcam", 3)
-    camera3.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    mjpegServer3 = cs.MjpegServer("httpserver", 5804)
-    mjpegServer3.setSource(camera3)
-
-    cvsink3 = cs.CvSink("cvsink")
-    cvsink3.setSource(camera3)
-
-
-
-
-    camera4 = cs.UsbCamera("usbcam", 4)
-    camera4.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    mjpegServer4 = cs.MjpegServer("httpserver", 5804)
-    mjpegServer4.setSource(camera4)
-
-    cvsink4 = cs.CvSink("cvsink")
-    cvsink4.setSource(camera4)
-
-
-
-    camera5 = cs.UsbCamera("usbcam", 5)
-    camera5.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
-
-    mjpegServer5 = cs.MjpegServer("httpserver", 5805)
-    mjpegServer5.setSource(camera5)
-
-    cvsink5 = cs.CvSink("cvsink")
-    cvsink5.setSource(camera5)
-
-    '''
 
     #processed camera
 
@@ -176,11 +113,11 @@ def main():
 def setCamera():
     print("starting process camera")
 
-    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 0))
-    pcPort = abs(cameraTable.getNumber('processCameraPort', 5801))
-    pcWidth = abs(cameraTable.getNumber('processCameraWidth', 640))
-    pcHeight = abs(cameraTable.getNumber('processCameraHeight', 480))
-    pcFps = abs(cameraTable.getNumber('processCameraFps', 30))
+    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 1))
+    pcPort = abs(cameraTable.getNumber('processCameraPort', 5802))
+    pcWidth = abs(cameraTable.getNumber('processCameraWidth', 320))
+    pcHeight = abs(cameraTable.getNumber('processCameraHeight', 240))
+    pcFps = abs(cameraTable.getNumber('processCameraFps', 15 ))
 
     fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
     cameraMatrix = fs.getNode('Camera_Matrix').mat()
@@ -188,7 +125,6 @@ def setCamera():
     fs.release()
 
     camera = cs.UsbCamera("usbcam", pcNumber)
-
 
     camera.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 1)))
     camera.getProperty("exposure_absolute").set(abs(cameraTable.getNumber('processCameraExposureAbsolute', 1)))
@@ -198,10 +134,8 @@ def setCamera():
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, pcWidth, pcHeight, pcFps)
 
-
     cvSink = cs.CvSink("cvsink")
     cvSink.setSource(camera)
-
 
     cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, pcWidth, pcHeight, pcFps)
     server = cs.MjpegServer("cvhttpserver", pcPort)
@@ -210,7 +144,6 @@ def setCamera():
 
     img = np.zeros(shape=(pcHeight, pcWidth, 3), dtype=np.uint8)
     fixed = np.zeros(shape=(pcHeight, pcWidth, 3), dtype=np.uint8)
-
 
     q = Queue()
     p = None
@@ -321,7 +254,7 @@ def findTape2(img):
         box = cv2.minAreaRect(contour)
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
-        topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
+
 
 
     relevant.sort(key=lambda x: x[0])
@@ -332,7 +265,6 @@ def findTape2(img):
     distance = 0
 
     while len(relevant) > .5:
-
         #cameraTable.putBoolean('tapeFound', False)
         #cameraTable.putNumber('distanceToTape', -1)
         #cameraTable.putNumber('tapeX', -1)
@@ -349,13 +281,9 @@ def findTape2(img):
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
-
-
-
             if box1[0] > box2[0]:
                 greaterXVal = box1[0]
                 smallerXVal = box2[0]
-
             else:
                 greaterXVal = box2[0]
                 smallerXVal = box1[0]
@@ -371,17 +299,18 @@ def findTape2(img):
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
 
-            #tapeStrafe = (finalCenter - (640/2))/640 * 5
-            #cv2.putText(img, 'tapeStrafe: ' + str(tapeStrafe), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
 
+
+            cv2.putText(img, 'd: ' + str(distance), (100, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+            #tapeX = (finalCenter - (640/2))/640 * 5
+            #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
             width = box2[0] +  box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
-
             height = yPoints[3] - yPoints[0]
-
             ratio = width / height
 
             # Ignore if wrong shape (8" x 15.3")
@@ -393,10 +322,12 @@ def findTape2(img):
 
     tMessage = ""
     hasTape = False
-    tapeStrafe = -1
+    tapeX = -1
     tapeDistance = 0
 
-    if len(switches) >= 0:
+    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+
+    if len(switches) == 1:
         hasTape = True
 
 
@@ -414,358 +345,7 @@ def findTape2(img):
     else:
         cameraTable.putBoolean('tapeFound', False)
 
-        cameraTable.putNumber('tapeStrafe', finalCenter)
-        cameraTable.putNumber('distanceToTape', int(distance))
-        tapeStrafe = (finalCenter - (640/2))/640 * 35
-        tapeDistance = int(distance)
-
-
-        bottomRightX = int(topLeftX + width)
-        bottomRightY = int(topLeftY + height)
-
-        """
-        centerX = box1[0]
-        centerY = box1[1]
-        width = box1[2]
-        height = box1[3]
-        """
-
-        cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 26), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-
-        cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
-        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
-
-        cv2.rectangle(img, (topLeftX, topLeftY), (topLeftX + width, topLeftY + height), (0, 0, 255), 3)
-#        cv2.rectangle(img, (switches[0][0], switches[0][1]), (400, 240), color['red'], 3)
-
-
-
-        cv2.putText(img, 'C', (bottomRightX, bottomRightY), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
-
-    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeStrafe)+",tapeDistance:"+str(tapeDistance)
-
-
-    sendUdp(tMessage)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def findSingleTape(img, screenWidth):
-    secondScreenWidth = screenWidth
-
-    pipeline.process(img)
-
-    #pl = pipeline.process(img)
-    #print("got pl-" + str(pl))
-
-    #if pipeline:
-        #print("got pl")
-        #contours = pl.filter_contours_output filter_contours_output
-        #contours = pipeline.filter_contours_output()
-    #else:
-        #print("no pl")
-    '''
-    for contour in pipeline.find_contours_output:
-        #print("got contour")
-        x, y, w, h = cv2.boundingRect(contour)
-        #print("x-"+str(x))
-        cv2.drawContours(img, contour, -1, color['red'])
-        cv2.circle(img, (x, y), 10, color['neon'], 3)
-    '''
-
-    contours = pipeline.find_contours_output #findContours(img, tapeHSV)
-    cv2.drawContours(img, contours, -1, color['yellow'])
-    relevant = []
-    temp_height = 350
-    cameraTable.putBoolean('tapeFound', False)
-    bensBoxes = []
-    slantedBois = []
-    boxes = []
-
-    for contour in contours:
-        area = cv2.contourArea(contour)
-
-        if area < 60:
-
-            cv2.putText(img, ' AREA ERROR', (50, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-            continue
-
-        solidity = 100 * area / cv2.contourArea(cv2.convexHull(contour))
-
-        if solidity < 95.0:
-            continue
-
-        if cv2.boundingRect(contour)[2] >= cv2.boundingRect(contour)[3]:
-            continue
-
-        topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
-        slantedBois.append(cv2.minAreaRect(contour))
-
-
-        #box = cv2.minAreaRect(contour)
-
-        # Checks if width is less than height.
-        relevant.append(cv2.boundingRect(contour))
-
-        try:
-            if relevant[0][2] > 50:
-                continue
-            else:
-                #topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
-                #bensBoxes.append(cv2.boundingRect(contour))
-                #slantedBois.append(cv2.minAreaRect(contour))
-                pass
-        except IndexError:
-            continue
-
-    relevant.sort(key=lambda x: x[0])
-    switches = []
-    distances = []
-    chooseHeights = []
-
-    finalCenter = 0
-    distance = 0
-
-
-    while len(relevant) > .5:
-        cameraTable.putBoolean('tapeFound', False)
-        cameraTable.putNumber('tapeDistance', -1)
-        cameraTable.putNumber('tapeStrafe', -1)
-
-        box1 = relevant.pop(0)
-        print('relevant')
-        for box2 in relevant:
-
-            sizeLimit = box1[1] * 0.2
-            heightLimit = box1[3] * 0.5
-
-            #Are the boxes next two each other? 2.0!!!
-            """
-            if abs(box1[0] - box2[0]) > 10 * box1[2]:
-                cv2.putText(img, ' ERROR is...' + str(topLeftX), (320, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-                continue
-            """
-
-            # Are the boxes next to each other?
-            if abs(box1[1] - box2[1]) > .25 * box1[2]:
-                continue
-
-            # Are the boxes the same size?
-            if abs(box1[3] - box2[3]) > .25 * box1[3]:
-                continue
-
-            # Funky, is there a box inside of a box?
-
-            if abs((box1[0] + box1[2] + sizeLimit)) > box2[0] and abs(box1[0] - sizeLimit) < box2[0]:
-                continue
-
-            if abs(box1[2] - box2[2]) > heightLimit:
-                continue
-
-            if len(bensBoxes) >= 3:
-                bensBoxes = sorted(bensBoxes, key=lambda boxx:abs(boxx[0]-secondScreenWidth))
-                bensBoxes = bensBoxes[0:2]
-
-            bensBoxes.append(box1)
-            bensBoxes.append(box2)
-
-
-
-            #TODO: Work out the kinks in the focusing on one object (below)
-
-
-            """
-            if abs(box1[1] - box2[1]) * 10 > 15:
-                continue
-
-            cv2.putText(img, 'difference: ' + str(abs(box1[2] - box2[2])), (box2[0], box2[1]), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-            """
-
-
-            """
-           # individualDistance =
-            chooseHeights.append(abs(box1[3] - box2[3]))
-            if len(chooseHeights) > 1:
-                if chooseHeights[0] < abs(box1[3] - box2[3]):
-                    continue
-            """
-            if box1[0] > box2[0]:
-                greaterXVal = box1[0]
-                smallerXVal = box2[0]
-
-            else:
-                greaterXVal = box2[0]
-                smallerXVal = box1[0]
-
-            displacement = greaterXVal - smallerXVal
-            centerDisplacement = displacement / 2
-            finalCenter = smallerXVal + centerDisplacement
-
-            #tapeStrafe = (finalCenter - (640/2))/640 * 5
-            #cv2.putText(img, 'tapeStrafe: ' + str(tapeStrafe), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-
-           # width = relevant[0][2]
-            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
-            yPoints.sort()
-            height = yPoints[3] - yPoints[0]
-            width = box2[2]
-
-            switches.append((box1[0], yPoints[0], width, height))
-
-
-    tMessage = ""
-    hasTape = False
-    tapeAngle = -1
-    tapeStrafe = -1
-    tapeDistance = 0
-
-    if len(bensBoxes) > 1:
-        hasTape = True
-
-
-
-        """
-        centerX = box1[0]
-        centerY = box1[1]
-        width = box1[2]
-        height = box1[3]
-        """
-        firstHeight = int(bensBoxes[0][3])
-
-        try:
-            secondHeight = int(bensBoxes[1][3])
-            chooseHeights.append((firstHeight, secondHeight))
-
-        except IndexError:
-            chooseHeights.append((firstHeight))
-
-
-        #cv2.putText(img, ' LENGTH OF BB' + str(len(bensBoxes)), (200, 200), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
->>>>>>> d9e491a526955b4bf68635d5acaecfcf5ae79edd
-
-        topRightX2Displacement = 0
-        topLeftY2 = 0
-
-        moreThanTwo = True
-        while moreThanTwo:
-            bensBoxes = sorted(bensBoxes, key=lambda boxx:abs(boxx[0]-secondScreenWidth))
-
-            #if len(bensBoxes) < 2 and len(bensBoxes) >= 1:
-
-                #topLeftX = bensBoxes[0][0]
-                #topLeftY = bensBoxes[0][1]
-                #width = bensBoxes[0][2]
-                #height = bensBoxes[0][3]
-
-                #bottomRightX = int(topLeftX + width)
-                #bottomRightY = int(topLeftY + height)
-
-                #topLeftX2 = 0
-                #topLeftY2 = 0
-
-                #topRightX2Displacement = 0
-
-                #try:
-                    #rect = slantedBois[0]
-                    #box = cv2.boxPoints(rect)
-                    #box = np.int0(box)
-
-                    #cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
-
-
-                #except IndexError:
-                    #pass
-
-            if len(bensBoxes) == 2:
-                bensBoxes = sorted(bensBoxes, key=lambda box: box[0])
-                finalBoxes = bensBoxes
-                topLeftX = finalBoxes[0][0]
-                topLeftY = finalBoxes[0][1]
-                width = finalBoxes[0][2]
-                height = finalBoxes[0][3]
-
-                topLeftX2 = finalBoxes[1][0]
-                topLeftY2 = finalBoxes[1][1]
-                width2 = finalBoxes[1][2]
-                height2 = finalBoxes[1][3]
-
-                bottomRightX = int(topLeftX + width)
-                bottomRightY = int(topLeftY + height)
-
-                bottomRightX2 = int(topLeftX2 + width2)
-                bottomRightY2 = int(topLeftY2 + height2)
-
-                rect = slantedBois[0]
-                rect2 = slantedBois[1]
-                box = cv2.boxPoints(rect)
-                box = np.int0(box)
-                box2 = cv2.boxPoints(rect2)
-                box2 = np.int0(box2)
-
-                screenWidth *= 2
-                topRightX2Displacement = abs(screenWidth - (bottomRightX2))
-
-                cv2.drawContours(img, [box], -1, (255, 0, 0), 3)
-                cv2.drawContours(img, [box2], -1, (255, 0, 0), 3)
-
-                distanceBetweenObject = abs(finalBoxes[0][0] - finalBoxes[1][0])
-
-                distance = 16.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
-                moreThanTwo = False
-
-            else:
-                bensBoxes = sorted(bensBoxes, key=lambda box: box[0])
-                finalBoxes = bensBoxes
-                if finalBoxes[0] == finalBoxes[1]:
-                    del finalBoxes[1]
-                finalBoxes = finalBoxes[0:2]
-                continue
-
-        pixelSpan = int(abs(distance * 0.02))
-
-        heightDifferential = 0
-
-        if topLeftX < topRightX2Displacement:
-            val = -1 * abs(topRightX2Displacement - topLeftX)
-            cameraTable.putString('tapeStrafe', val)
-        else:
-            val = abs(topLeftX - topRightX2Displacement)
-            cameraTable.putString('tapeStrafe', val)
-
-        cameraTable.putBoolean('tapeFound', hasTape)
-
-        tapeAngle = (finalCenter - (640/2))/640 * 35
-        cameraTable.putNumber('tapeStrafe', tapeAngle)
-
-        cameraTable.putNumber('tapeStrafe', val)
-
-        tapeDistance = int(distance)
-        cameraTable.putNumber('tapeDistance', tapeDistance)
-
-        cv2.putText(img, ' tape angle ' + str(tapeAngle), (50, 260), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-        cv2.putText(img, ' tape distance ' + str(tapeDistance), (50, 285), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
-
-        tMessage = "tapeFound:"+str(hasTape)+",tapeAngle:"+str(tapeAngle)+",tapeDistance:"+str(tapeDistance)+",tapeStrafe:"+str(val)
+    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
 
 
     #sendUdp(tMessage)
@@ -799,13 +379,14 @@ def findTape(img):
 
 
     relevant.sort(key=lambda x: x[0])
+    cv2.putText(img, 'relevant length ' + str(len(relevant)), (100, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255))
     switches = []
 
 
     while len(relevant) > .30:
         cameraTable.putBoolean('tapeFound', False)
         cameraTable.putNumber('distanceToTape', -1)
-        cameraTable.putNumber('tapeStrafe', -1)
+        cameraTable.putNumber('tapeX', -1)
 
         box1 = relevant.pop(0)
         i_hate_this_code = 200
@@ -827,6 +408,28 @@ def findTape(img):
                 greaterXVal = box2[0]
                 smallerXVal = box1[0]
 
+            displacement = greaterXVal - smallerXVal
+            centerDisplacement = displacement / 2
+            finalCenter = smallerXVal + centerDisplacement
+
+            distanceBetweenObject = abs(box1[0] - box2[0])
+
+            distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
+
+
+
+            cv2.putText(img, 'distance between obj.: ' + str(distanceBetweenObject), (300, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 0, 0))
+
+            width = box2[0] +  box2[2] - box1[0]
+            yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
+            yPoints.sort()
+            height = yPoints[3] - yPoints[0]
+            ratio = width / height
+
+            # Ignore if wrong shape (8" x 15.3")
+            #if ratio < 0.3 or ratio > 0.6:
+             #   continue
+
             switches.append((box1[0], yPoints[0], width, height))
 
 
@@ -836,7 +439,7 @@ def findTape(img):
         cameraTable.putBoolean('tapeFound', hasTape)
 
         if hasTape:
-            cameraTable.putNumber('tapeStrafe', finalCenter)
+            cameraTable.putNumber('tapeX', finalCenter)
             cameraTable.putNumber('distanceToTape', int(distance))
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
