@@ -8,7 +8,7 @@ from networktables import NetworkTables
 from collections import namedtuple
 import math
 from multiprocessing import Process, Queue
-from pipelines import greentapehsv
+from pipelines import tapetarget
 
 import socket
 #import argparse
@@ -17,10 +17,10 @@ import socket
 #args = parser.parse_args()
 #print(args.counter + 1)
 
-UDP_IP = "10.25.39.2"
-UDP_PORT = 5809
+#UDP_IP = "10.25.39.2"
+#UDP_PORT = 5809
 
-pipeline = greentapehsv.GripPipeline()
+pipeline = tapetarget.TapeTarget()
 
 NetworkTables.initialize(server='roborio-2539-frc.local')
 
@@ -82,52 +82,123 @@ def main():
 
     #raw 2nd camera test, no processing, put first so it executes before infinite loop for processing
 
-    width=320
-    height=240
-    fps=15
+    width=640
+    height=480
+    fps=30
+
+    '''
+    camera0 = cs.UsbCamera("usbcam", 0)
+    camera0.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer0 = cs.MjpegServer("httpserver", 5800)
+    mjpegServer0.setSource(camera0)
+
+    cvsink0 = cs.CvSink("cvsink")
+    cvsink0.setSource(camera0)
+
+
+    camera1 = cs.UsbCamera("usbcam", 1)
+    camera1.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer1 = cs.MjpegServer("httpserver", 5801)
+    mjpegServer1.setSource(camera1)
+
+    cvsink1 = cs.CvSink("cvsink")
+    cvsink1.setSource(camera1)
+
+
+
 
     camera2 = cs.UsbCamera("usbcam", 2)
     camera2.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
-    mjpegServer2 = cs.MjpegServer("httpserver", 5802)
+    mjpegServer2 = cs.MjpegServer("httpserver", 5803)
     mjpegServer2.setSource(camera2)
 
     cvsink2 = cs.CvSink("cvsink")
     cvsink2.setSource(camera2)
 
+
+
+
+    camera3 = cs.UsbCamera("usbcam", 3)
+    camera3.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer3 = cs.MjpegServer("httpserver", 5804)
+    mjpegServer3.setSource(camera3)
+
+    cvsink3 = cs.CvSink("cvsink")
+    cvsink3.setSource(camera3)
+
+
+
+
+    camera4 = cs.UsbCamera("usbcam", 4)
+    camera4.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer4 = cs.MjpegServer("httpserver", 5804)
+    mjpegServer4.setSource(camera4)
+
+    cvsink4 = cs.CvSink("cvsink")
+    cvsink4.setSource(camera4)
+
+
+
+    camera5 = cs.UsbCamera("usbcam", 5)
+    camera5.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    mjpegServer5 = cs.MjpegServer("httpserver", 5805)
+    mjpegServer5.setSource(camera5)
+
+    cvsink5 = cs.CvSink("cvsink")
+    cvsink5.setSource(camera5)
+
+    '''
+
     #processed camera
+
     setCamera()
+
+    #while True:
+    #    print("Ready")
 
 
 
 
 def setCamera():
     print("starting process camera")
+
+    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 0))
+    pcPort = abs(cameraTable.getNumber('processCameraPort', 5801))
+    pcWidth = abs(cameraTable.getNumber('processCameraWidth', 640))
+    pcHeight = abs(cameraTable.getNumber('processCameraHeight', 480))
+    pcFps = abs(cameraTable.getNumber('processCameraFps', 30))
+
     fs = cv2.FileStorage("back_camera_data.xml", cv2.FILE_STORAGE_READ)
     cameraMatrix = fs.getNode('Camera_Matrix').mat()
     distortionCoefficients = fs.getNode('Distortion_Coefficients').mat()
     fs.release()
 
-    camera = cs.UsbCamera("usbcam", 0)
+    camera = cs.UsbCamera("usbcam", pcNumber)
 
-    camera.getProperty("exposure_auto").set(1)
-    camera.getProperty("exposure_absolute").set(1)
-    camera.getProperty("gamma").set(52) #12 day or 52 night
-    camera.getProperty("white_balance_temperature_auto").set(0)
-    camera.getProperty("brightness").set(40) #20 day or 40 night
+    camera.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 1)))
+    camera.getProperty("exposure_absolute").set(abs(cameraTable.getNumber('processCameraExposureAbsolute', 1)))
+    camera.getProperty("gamma").set(abs(cameraTable.getNumber('processCameraGamma', 39))) #12 day or 52 night
+    camera.getProperty("white_balance_temperature_auto").set(abs(cameraTable.getNumber('processCameraWBAuto', 0)))
+    camera.getProperty("brightness").set(abs(cameraTable.getNumber('processCameraBrightness', 45))) #20 day or 40 night
 
-    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 15)
+    camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, pcWidth, pcHeight, pcFps)
 
     cvSink = cs.CvSink("cvsink")
     cvSink.setSource(camera)
 
-    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, 640, 480, 30)
-    server = cs.MjpegServer("cvhttpserver", 5801)
+    cvSource = cs.CvSource("cvsource", cs.VideoMode.PixelFormat.kMJPEG, pcWidth, pcHeight, pcFps)
+    server = cs.MjpegServer("cvhttpserver", pcPort)
     server.setSource(cvSource)
 
 
-    img = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
-    fixed = np.zeros(shape=(480, 640, 3), dtype=np.uint8)
+    img = np.zeros(shape=(pcHeight, pcWidth, 3), dtype=np.uint8)
+    fixed = np.zeros(shape=(pcHeight, pcWidth, 3), dtype=np.uint8)
 
     q = Queue()
     p = None
@@ -178,7 +249,7 @@ def setCamera():
 def process(src):
     #findTape(src)
     #findCubes(src)
-    findCargo(src)
+    #findCargo(src)
 
     findTape2(src)
 
@@ -228,7 +299,7 @@ def findTape2(img):
     cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
     temp_height = 350
-    cameraTable.putBoolean('tapeFound', False)
+    #cameraTable.putBoolean('tapeFound', False)
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -249,9 +320,9 @@ def findTape2(img):
     distance = 0
 
     while len(relevant) > .5:
-        cameraTable.putBoolean('tapeFound', False)
-        cameraTable.putNumber('distanceToTape', -1)
-        cameraTable.putNumber('tapeX', -1)
+        #cameraTable.putBoolean('tapeFound', False)
+        #cameraTable.putNumber('distanceToTape', -1)
+        #cameraTable.putNumber('tapeX', -1)
 
         box1 = relevant.pop(0)
         i_hate_this_code = 200
@@ -314,22 +385,25 @@ def findTape2(img):
     if len(switches) == 1:
         hasTape = True
 
-        cameraTable.putBoolean('tapeFound', hasTape)
 
-        cameraTable.putNumber('tapeX', finalCenter)
-        cameraTable.putNumber('distanceToTape', int(distance))
         tapeX = (finalCenter - (640/2))/640 * 35
         tapeDistance = int(distance)
+
+        cameraTable.putBoolean('tapeFound', hasTape)
+
+        cameraTable.putNumber('tapeX', tapeX)
+        cameraTable.putNumber('distanceToTape', int(distance))
 
         cv2.putText(img, 'tapex: ' + str(tapeX), (50, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
         cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
-
+    else:
+        cameraTable.putBoolean('tapeFound', False)
 
     tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
 
 
-    sendUdp(tMessage)
+    #sendUdp(tMessage)
 
 def sendUdp(message):
 
@@ -350,7 +424,7 @@ def findTape(img):
 
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 25:
+        if area < 15:
             continue
 
         box = cv2.minAreaRect(contour)
@@ -364,7 +438,7 @@ def findTape(img):
     switches = []
 
 
-    while len(relevant) > .50:
+    while len(relevant) > .30:
         cameraTable.putBoolean('tapeFound', False)
         cameraTable.putNumber('distanceToTape', -1)
         cameraTable.putNumber('tapeX', -1)
