@@ -85,18 +85,24 @@ def main():
 
     width=320
     height=240
-    fps=5
+    fps=30
 
     #cs.startAutomaticCapture(dev=None, name=None, path=None, camera=None, return_server=False)
-
-    camera0 = cs.UsbCamera("usbcam", 3)
+    #was 2
+    camera0 = cs.UsbCamera("usbcam", 1)
     camera0.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
+
+    camera0.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 1)))
+    camera0.getProperty("exposure_absolute").set(abs(cameraTable.getNumber('processCameraExposureAbsolute', 16)))
+    #camera0.getProperty("gamma").set(abs(cameraTable.getNumber('processCameraGamma', 50))) #12 day or 52 night
+    #camera0.getProperty("white_balance_temperature_auto").set(abs(cameraTable.getNumber('processCameraWBAuto', 0)))
+    #camera.getProperty("brightness").set(abs(cameraTable.getNumber('processCameraBrightness', 15))) #20 day or 40 night
 
     mjpegServer0 = cs.MjpegServer("httpserver", 5801)
     mjpegServer0.setSource(camera0)
 
-    #cvsink0 = cs.CvSink("cvsink")
-    #cvsink0.setSource(camera0)
+    cvsink0 = cs.CvSink("cvsink")
+    cvsink0.setSource(camera0)
 
 
 
@@ -113,7 +119,7 @@ def main():
 def setCamera():
     print("starting process camera")
 
-    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 1))
+    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 0))
     pcPort = abs(cameraTable.getNumber('processCameraPort', 5802))
     pcWidth = abs(cameraTable.getNumber('processCameraWidth', 320))
     pcHeight = abs(cameraTable.getNumber('processCameraHeight', 240))
@@ -126,11 +132,11 @@ def setCamera():
 
     camera = cs.UsbCamera("usbcam", pcNumber)
 
-    camera.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 1)))
+    camera.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 0)))
     camera.getProperty("exposure_absolute").set(abs(cameraTable.getNumber('processCameraExposureAbsolute', 1)))
-    camera.getProperty("gamma").set(abs(cameraTable.getNumber('processCameraGamma', 39))) #12 day or 52 night
+    camera.getProperty("gamma").set(abs(cameraTable.getNumber('processCameraGamma', 52))) #12 day or 52 night
     camera.getProperty("white_balance_temperature_auto").set(abs(cameraTable.getNumber('processCameraWBAuto', 0)))
-    camera.getProperty("brightness").set(abs(cameraTable.getNumber('processCameraBrightness', 45))) #20 day or 40 night
+    camera.getProperty("brightness").set(abs(cameraTable.getNumber('processCameraBrightness', 35))) #20 day or 40 night
 
     camera.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, pcWidth, pcHeight, pcFps)
 
@@ -244,7 +250,7 @@ def findTape2(img):
     cv2.drawContours(img, contours, -1, color['gray'])
     relevant = []
     temp_height = 350
-    #cameraTable.putBoolean('tapeFound', False)
+    cameraTable.putBoolean('tapeFound', False)
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -254,7 +260,7 @@ def findTape2(img):
         box = cv2.minAreaRect(contour)
         # Checks if width is less than height.
         relevant.append(cv2.boundingRect(contour))
-
+        topLeftX, topLeftY, width, height = cv2.boundingRect(contour)
 
 
     relevant.sort(key=lambda x: x[0])
@@ -265,9 +271,9 @@ def findTape2(img):
     distance = 0
 
     while len(relevant) > .5:
-        #cameraTable.putBoolean('tapeFound', False)
-        #cameraTable.putNumber('distanceToTape', -1)
-        #cameraTable.putNumber('tapeX', -1)
+        cameraTable.putBoolean('tapeFound', False)
+        cameraTable.putNumber('distanceToTape', -1)
+        cameraTable.putNumber('tapeX', -1)
 
         box1 = relevant.pop(0)
         i_hate_this_code = 200
@@ -281,9 +287,13 @@ def findTape2(img):
             if abs(box1[3] - box2[3]) > .25 * box1[3]:
                 continue
 
+
+
+
             if box1[0] > box2[0]:
                 greaterXVal = box1[0]
                 smallerXVal = box2[0]
+
             else:
                 greaterXVal = box2[0]
                 smallerXVal = box1[0]
@@ -299,18 +309,17 @@ def findTape2(img):
             distance = 18.55649 + (155.5885 * math.exp(-0.00888356 * int(distanceBetweenObject)))
 
 
+            #tapeStrafe = (finalCenter - (640/2))/640 * 5
+            #cv2.putText(img, 'tapeStrafe: ' + str(tapeStrafe), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
 
-
-            cv2.putText(img, 'd: ' + str(distance), (100, 350), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
-
-            #tapeX = (finalCenter - (640/2))/640 * 5
-            #cv2.putText(img, 'tapex: ' + str(tapeX), (100, 300), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
             width = box2[0] +  box2[2] - box1[0]
             yPoints = [box1[1], box2[1], box1[1] + box1[3], box2[1] + box2[3]]
             yPoints.sort()
+
             height = yPoints[3] - yPoints[0]
+
             ratio = width / height
 
             # Ignore if wrong shape (8" x 15.3")
@@ -322,30 +331,50 @@ def findTape2(img):
 
     tMessage = ""
     hasTape = False
-    tapeX = -1
+    tapeStrafe = -1
     tapeDistance = 0
 
-    cv2.putText(img, 's: ' + str(len(switches)), (0, 450), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
+    if switches:
+        #tswitches = np.asarray(switches[0])
+        if switches:
+            hasTape = True
 
-    if len(switches) == 1:
-        hasTape = True
+            cameraTable.putBoolean('tapeFound', hasTape)
+
+        
+            cameraTable.putNumber('distanceToTape', int(distance))
+            tapeX = (finalCenter - (320/2))/320 * 35
+            cameraTable.putNumber('tapeX', tapeX)
+            tapeDistance = int(distance)
 
 
-        tapeX = (finalCenter - (640/2))/640 * 35
-        tapeDistance = int(distance)
+            bottomRightX = int(topLeftX + width)
+            bottomRightY = int(topLeftY + height)
 
-        cameraTable.putBoolean('tapeFound', hasTape)
+            """
+            centerX = box1[0]
+            centerY = box1[1]
+            width = box1[2]
+            height = box1[3]
+            """
 
-        cameraTable.putNumber('tapeX', tapeX)
-        cameraTable.putNumber('distanceToTape', int(distance))
+            #cv2.putText(img, 'bottomRightY: ' + str(bottomRightY), (200, 26), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
 
-        cv2.putText(img, 'tapex: ' + str(tapeX), (50, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 100))
+            #cv2.putText(img, 'box1: ' + str(box1), (200, 240), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255, 255, 255))
 
-        cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
-    else:
-        cameraTable.putBoolean('tapeFound', False)
+            cv2.rectangle(img, (switches[0][0], switches[0][1]), (switches[0][0] + switches[0][2], switches[0][1] + switches[0][3]), color['green'], 3)
 
-    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeX)+",tapeDistance:"+str(tapeDistance)
+            #cv2.rectangle(img, (topLeftX, topLeftY), (topLeftX + width, topLeftY + height), (0, 0, 255), 3)
+            #cv2.rectangle(img, (switches[0][0], switches[0][1]), (400, 240), color['red'], 3)
+
+
+
+            cv2.putText(img, 'X: '+str(tapeX), (20,20), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 255, 255))
+            cv2.putText(img, 'D: '+str(tapeDistance), (40,40), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, (255, 255, 255))
+
+
+
+    tMessage = "tapeFound:"+str(hasTape)+",tapePos:"+str(tapeStrafe)+",tapeDistance:"+str(tapeDistance)
 
 
     #sendUdp(tMessage)
