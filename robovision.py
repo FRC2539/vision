@@ -89,7 +89,7 @@ def main():
 
     #cs.startAutomaticCapture(dev=None, name=None, path=None, camera=None, return_server=False)
     #was 2
-    camera0 = cs.UsbCamera("usbcam", 1)
+    camera0 = cs.UsbCamera("usbcam", 0)
     camera0.setVideoMode(cs.VideoMode.PixelFormat.kMJPEG, width, height, fps)
 
     camera0.getProperty("exposure_auto").set(abs(cameraTable.getNumber('processCameraExposureAuto', 1)))
@@ -119,7 +119,7 @@ def main():
 def setCamera():
     print("starting process camera")
 
-    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 0))
+    pcNumber = abs(cameraTable.getNumber('processCameraNumber', 2))
     pcPort = abs(cameraTable.getNumber('processCameraPort', 5802))
     pcWidth = abs(cameraTable.getNumber('processCameraWidth', 320))
     pcHeight = abs(cameraTable.getNumber('processCameraHeight', 240))
